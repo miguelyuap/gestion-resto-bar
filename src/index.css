@@ -1,0 +1,85 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    background-color: #0b0f19;
+    color: #f1f5f9;
+  }
+}
+
+/* Custom Glassmorphism Cards */
+.glass-panel {
+  background: rgba(19, 27, 46, 0.75);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.glass-card {
+  background: rgba(30, 41, 59, 0.6);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+/* Custom Glowing effects */
+.glow-cyan {
+  box-shadow: 0 0 20px -5px rgba(6, 182, 212, 0.4);
+}
+
+.glow-emerald {
+  box-shadow: 0 0 20px -5px rgba(16, 185, 129, 0.4);
+}
+
+/* Order Pulse Animation for Kitchen realtime alert */
+@keyframes pulse-ring {
+  0% { transform: scale(0.95); opacity: 0.9; }
+  50% { transform: scale(1.02); opacity: 1; box-shadow: 0 0 25px rgba(236, 72, 153, 0.6); }
+  100% { transform: scale(0.95); opacity: 0.9; }
+}
+
+.new-order-pulse {
+  animation: pulse-ring 1.5s infinite ease-in-out;
+}
+
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #0b0f19;
+}
+::-webkit-scrollbar-thumb {
+  background: #1e293b;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #06b6d4;
+}
+
+/* Estilos de Impresión para Factura Thermal/Standard Receipt */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  #printable-ticket, #printable-ticket * {
+    visibility: visible;
+  }
+  #printable-ticket {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 80mm; /* Ancho estándar de ticket térmico pos */
+    padding: 10px;
+    margin: 0 auto;
+    color: #000 !important;
+    background: #fff !important;
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 12px;
+  }
+  .no-print {
+    display: none !important;
+  }
+}
