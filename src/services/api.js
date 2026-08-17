@@ -335,40 +335,53 @@ const notifyMockListeners = (event, payload) => {
 };
 
 export const apiService = {
+  // 1. OBTENER PRODUCTOS CON RESPALDO DE SEGURIDAD
   async getProductos() {
     if (isSupabaseConfigured) {
-      const { data, error } = await supabase
-        .from('productos')
-        .select('*')
-        .eq('activo', true)
-        .order('categoria', { ascending: true });
-      if (error) throw error;
-      return data;
+      try {
+        const { data, error } = await supabase
+          .from('productos')
+          .select('*')
+          .eq('activo', true)
+          .order('categoria', { ascending: true });
+        
+        if (!error && data && data.length > 0) {
+          return data;
+        }
+      } catch (err) {
+        console.warn('Usando catálogo local de respaldo:', err);
+      }
     }
     return MOCK_PRODUCTS;
   },
 
+  // 2. OBTENER MESAS
   async getMesas() {
     if (isSupabaseConfigured) {
-      const { data: mesasData, error: errMesas } = await supabase
-        .from('mesas')
-        .select('*')
-        .order('numero_mesa', { ascending: true });
-      if (errMesas) throw errMesas;
+      try {
+        const { data: mesasData, error: errMesas } = await supabase
+          .from('mesas')
+          .select('*')
+          .order('numero_mesa', { ascending: true });
 
-      const { data: pedidosActivos } = await supabase
-        .from('pedidos')
-        .select('*, detalle_pedido(*)')
-        .neq('estado', 'facturado');
+        if (!errMesas && mesasData && mesasData.length > 0) {
+          const { data: pedidosActivos } = await supabase
+            .from('pedidos')
+            .select('*, detalle_pedido(*)')
+            .neq('estado', 'facturado');
 
-      return mesasData.map(m => {
-        const pActivo = pedidosActivos?.find(p => p.mesa_id === m.id);
-        return {
-          ...m,
-          estado: pActivo ? 'ocupada' : 'disponible',
-          pedidoActivo: pActivo || null
-        };
-      });
+          return mesasData.map(m => {
+            const pActivo = pedidosActivos?.find(p => p.mesa_id === m.id);
+            return {
+              ...m,
+              estado: pActivo ? 'ocupada' : 'disponible',
+              pedidoActivo: pActivo || null
+            };
+          });
+        }
+      } catch (err) {
+        console.warn('Usando mesas locales de respaldo:', err);
+      }
     }
 
     return MOCK_MESAS.map(m => {
@@ -387,41 +400,36 @@ export const apiService = {
       : (notas || '');
 
     if (isSupabaseConfigured) {
-      const { data: pedido, error: errPedido } = await supabase
-        .from('pedidos')
-        .insert([
-          {
-            mesa_id,
-            total,
-            estado: 'pendiente',
-            notas: notasCompletas
-          }
-        ])
-        .select()
-        .single();
+      try {
+        const { data: pedido, error: errPedido } = await supabase
+          .from('pedidos')
+          .insert([
+            {
+              mesa_id,
+              total,
+              estado: 'pendiente',
+              notas: notasCompletas
+            }
+          ])
+          .select()
+          .single();
 
-      if (errPedido) throw errPedido;
+        if (!errPedido && pedido) {
+          const detalles = items.map(item => ({
+            pedido_id: pedido.id,
+            producto_id: item.producto.id,
+            tamano: item.tamano,
+            cantidad: item.cantidad,
+            precio_unitario: item.precio_unitario
+          }));
 
-      const detalles = items.map(item => ({
-        pedido_id: pedido.id,
-        producto_id: item.producto.id,
-        tamano: item.tamano,
-        cantidad: item.cantidad,
-        precio_unitario: item.precio_unitario
-      }));
-
-      const { error: errDetalle } = await supabase
-        .from('detalle_pedido')
-        .insert(detalles);
-
-      if (errDetalle) throw errDetalle;
-
-      await supabase
-        .from('mesas')
-        .update({ estado: 'ocupada' })
-        .eq('id', mesa_id);
-
-      return pedido;
+          await supabase.from('detalle_pedido').insert(detalles);
+          await supabase.from('mesas').update({ estado: 'ocupada' }).eq('id', mesa_id);
+          return pedido;
+        }
+      } catch (err) {
+        console.warn('Creando pedido en respaldo local:', err);
+      }
     }
 
     // Mock Mode
@@ -450,39 +458,44 @@ export const apiService = {
 
   async adicionarAPedidoExistente({ pedidoId, items, montoAdicional, notas }) {
     if (isSupabaseConfigured) {
-      const { data: pedidoActual } = await supabase
-        .from('pedidos')
-        .select('total, notas')
-        .eq('id', pedidoId)
-        .single();
+      try {
+        const { data: pedidoActual } = await supabase
+          .from('pedidos')
+          .select('total, notas')
+          .eq('id', pedidoId)
+          .single();
 
-      const nuevoTotal = Number(pedidoActual.total) + Number(montoAdicional);
-      const notasActualizadas = notas ? `${pedidoActual.notas || ''} | Adición: ${notas}` : pedidoActual.notas;
+        if (pedidoActual) {
+          const nuevoTotal = Number(pedidoActual.total) + Number(montoAdicional);
+          const notasActualizadas = notas ? `${pedidoActual.notas || ''} | Adición: ${notas}` : pedidoActual.notas;
 
-      const detalles = items.map(item => ({
-        pedido_id: pedidoId,
-        producto_id: item.producto.id,
-        tamano: item.tamano,
-        cantidad: item.cantidad,
-        precio_unitario: item.precio_unitario
-      }));
+          const detalles = items.map(item => ({
+            pedido_id: pedidoId,
+            producto_id: item.producto.id,
+            tamano: item.tamano,
+            cantidad: item.cantidad,
+            precio_unitario: item.precio_unitario
+          }));
 
-      await supabase.from('detalle_pedido').insert(detalles);
+          await supabase.from('detalle_pedido').insert(detalles);
 
-      const { data: pedidoUpd, error } = await supabase
-        .from('pedidos')
-        .update({
-          total: nuevoTotal,
-          estado: 'pendiente',
-          notas: notasActualizadas,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', pedidoId)
-        .select()
-        .single();
+          const { data: pedidoUpd } = await supabase
+            .from('pedidos')
+            .update({
+              total: nuevoTotal,
+              estado: 'pendiente',
+              notas: notasActualizadas,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', pedidoId)
+            .select()
+            .single();
 
-      if (error) throw error;
-      return pedidoUpd;
+          if (pedidoUpd) return pedidoUpd;
+        }
+      } catch (err) {
+        console.warn('Adicionando a pedido en respaldo local:', err);
+      }
     }
 
     // Mock Mode
@@ -510,87 +523,80 @@ export const apiService = {
 
   async getPedidos(filtros = {}) {
     if (isSupabaseConfigured) {
-      let query = supabase
-        .from('pedidos')
-        .select(`
-          *,
-          mesas (numero_mesa),
-          detalle_pedido (
-            id,
-            tamano,
-            cantidad,
-            precio_unitario,
-            subtotal,
-            productos (id, nombre, categoria, ingredientes)
-          )
-        `)
-        .order('created_at', { ascending: false });
+      try {
+        let query = supabase
+          .from('pedidos')
+          .select(`
+            *,
+            mesas (numero_mesa),
+            detalle_pedido (
+              id,
+              tamano,
+              cantidad,
+              precio_unitario,
+              subtotal,
+              productos (id, nombre, categoria, ingredientes)
+            )
+          `)
+          .order('created_at', { ascending: false });
 
-      if (filtros.mesa_id) {
-        query = query.eq('mesa_id', filtros.mesa_id);
-      }
-      if (filtros.estado) {
-        query = query.eq('estado', filtros.estado);
-      }
+        if (filtros.mesa_id) query = query.eq('mesa_id', filtros.mesa_id);
+        if (filtros.estado) query = query.eq('estado', filtros.estado);
 
-      const { data, error } = await query;
-      if (error) throw error;
-      return data;
+        const { data, error } = await query;
+        if (!error && data) return data;
+      } catch (err) {
+        console.warn('Obteniendo pedidos de respaldo local:', err);
+      }
     }
 
     let res = [...mockOrders];
-    if (filtros.mesa_id) {
-      res = res.filter(o => o.mesa_id === filtros.mesa_id);
-    }
-    if (filtros.estado) {
-      res = res.filter(o => o.estado === filtros.estado);
-    }
+    if (filtros.mesa_id) res = res.filter(o => o.mesa_id === filtros.mesa_id);
+    if (filtros.estado) res = res.filter(o => o.estado === filtros.estado);
     return res;
   },
 
   async actualizarEstadoPedido(pedidoId, nuevoEstado, metodoPago = null) {
     if (isSupabaseConfigured) {
-      const payload = { 
-        estado: nuevoEstado, 
-        updated_at: new Date().toISOString() 
-      };
-      if (metodoPago) {
-        payload.metodo_pago = metodoPago;
-      }
+      try {
+        const payload = { 
+          estado: nuevoEstado, 
+          updated_at: new Date().toISOString() 
+        };
+        if (metodoPago) payload.metodo_pago = metodoPago;
 
-      const { data, error } = await supabase
-        .from('pedidos')
-        .update(payload)
-        .eq('id', pedidoId)
-        .select()
-        .single();
-
-      if (error) throw error;
-
-      if (nuevoEstado === 'facturado') {
-        const { data: pedidoObj } = await supabase
+        const { data, error } = await supabase
           .from('pedidos')
-          .select('mesa_id')
+          .update(payload)
           .eq('id', pedidoId)
+          .select()
           .single();
 
-        if (pedidoObj) {
-          const { data: pendientes } = await supabase
-            .from('pedidos')
-            .select('id')
-            .eq('mesa_id', pedidoObj.mesa_id)
-            .neq('estado', 'facturado');
+        if (!error && data) {
+          if (nuevoEstado === 'facturado') {
+            const { data: pedidoObj } = await supabase
+              .from('pedidos')
+              .select('mesa_id')
+              .eq('id', pedidoId)
+              .single();
 
-          if (!pendientes || pendientes.length === 0) {
-            await supabase
-              .from('mesas')
-              .update({ estado: 'disponible' })
-              .eq('id', pedidoObj.mesa_id);
+            if (pedidoObj) {
+              const { data: pendientes } = await supabase
+                .from('pedidos')
+                .select('id')
+                .eq('mesa_id', pedidoObj.mesa_id)
+                .neq('estado', 'facturado');
+
+              if (!pendientes || pendientes.length === 0) {
+                await supabase.from('mesas').update({ estado: 'disponible' }).eq('id', pedidoObj.mesa_id);
+              }
+            }
           }
+          return data;
         }
+      } catch (err) {
+        console.warn('Actualizando pedido en respaldo local:', err);
       }
-
-      return data;
     }
 
     const index = mockOrders.findIndex(o => o.id === pedidoId);
@@ -605,48 +611,48 @@ export const apiService = {
 
   subscribeToPedidos(onNewOrder, onUpdateOrder) {
     if (isSupabaseConfigured) {
-      const channel = supabase
-        .channel('pedidos-realtime-channel')
-        .on(
-          'postgres_changes',
-          { event: 'INSERT', schema: 'public', table: 'pedidos' },
-          async (payload) => {
-            const { data } = await supabase
-              .from('pedidos')
-              .select(`
-                *,
-                mesas (numero_mesa),
-                detalle_pedido (
-                  id,
-                  tamano,
-                  cantidad,
-                  precio_unitario,
-                  subtotal,
-                  productos (id, nombre, categoria, ingredientes)
-                )
-              `)
-              .eq('id', payload.new.id)
-              .single();
+      try {
+        const channel = supabase
+          .channel('pedidos-realtime-channel')
+          .on(
+            'postgres_changes',
+            { event: 'INSERT', schema: 'public', table: 'pedidos' },
+            async (payload) => {
+              const { data } = await supabase
+                .from('pedidos')
+                .select(`
+                  *,
+                  mesas (numero_mesa),
+                  detalle_pedido (
+                    id,
+                    tamano,
+                    cantidad,
+                    precio_unitario,
+                    subtotal,
+                    productos (id, nombre, categoria, ingredientes)
+                  )
+                `)
+                .eq('id', payload.new.id)
+                .single();
 
-            if (data && onNewOrder) {
-              onNewOrder(data);
+              if (data && onNewOrder) onNewOrder(data);
             }
-          }
-        )
-        .on(
-          'postgres_changes',
-          { event: 'UPDATE', schema: 'public', table: 'pedidos' },
-          (payload) => {
-            if (onUpdateOrder) {
-              onUpdateOrder(payload.new);
+          )
+          .on(
+            'postgres_changes',
+            { event: 'UPDATE', schema: 'public', table: 'pedidos' },
+            (payload) => {
+              if (onUpdateOrder) onUpdateOrder(payload.new);
             }
-          }
-        )
-        .subscribe();
+          )
+          .subscribe();
 
-      return () => {
-        supabase.removeChannel(channel);
-      };
+        return () => {
+          supabase.removeChannel(channel);
+        };
+      } catch (err) {
+        console.warn('Error suscribiendo a Supabase Realtime:', err);
+      }
     }
 
     const listener = (eventType, payload) => {
