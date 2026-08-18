@@ -419,6 +419,14 @@ export const apiService = {
 
           if (mesaDb) {
             targetMesaId = mesaDb.id;
+          } else {
+            // Auto-crear la mesa en Supabase si no existía aún
+            const { data: newMesa } = await supabase
+              .from('mesas')
+              .insert([{ numero_mesa: parseInt(mesaNum), estado: 'ocupada' }])
+              .select()
+              .single();
+            if (newMesa) targetMesaId = newMesa.id;
           }
         }
 
@@ -437,7 +445,8 @@ export const apiService = {
           .single();
 
         if (errPedido) {
-          console.error('Error insertando en la tabla pedidos de Supabase:', errPedido);
+          console.error('❌ Error de Supabase al insertar pedido:', errPedido);
+          alert(`⚠️ Error de Supabase al guardar pedido: ${errPedido.message} (Código: ${errPedido.code})`);
         } else if (pedido) {
           // Obtener lista de productos de Supabase para mapear UUIDs reales
           const dbProducts = await this.getProductos();
