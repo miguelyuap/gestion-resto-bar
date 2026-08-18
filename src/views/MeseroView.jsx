@@ -140,6 +140,7 @@ export function MeseroView() {
       } else {
         resultOrder = await apiService.crearPedido({
           mesa_id: mesaObj.id,
+          selectedMesaNum: selectedMesa,
           items: cart,
           total: cartTotal,
           notas,
