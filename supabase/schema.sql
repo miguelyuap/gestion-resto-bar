@@ -1,11 +1,21 @@
 -- ==============================================================================
--- ESQUEMA INICIAL DE BASE DE DATOS PARA "GRANIZADOS & FLOW" (SUPABASE / POSTGRESQL)
+-- ESQUEMA COMPLETO DE BASE DE DATOS Y ROLES ("A LO MÁS AGOGO - GRANIZADOS & FLOW")
 -- ==============================================================================
 
 -- 1. EXTENSIONES
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
--- 2. TABLA DE PRODUCTOS
+-- 2. TABLA DE PERFILES DE USUARIOS (VINCULADA A auth.users DE SUPABASE)
+CREATE TABLE IF NOT EXISTS public.perfiles (
+    id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+    email TEXT UNIQUE NOT NULL,
+    nombre TEXT,
+    rol TEXT NOT NULL DEFAULT 'empleado' CHECK (rol IN ('admin', 'empleado')),
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 3. TABLA DE PRODUCTOS
 CREATE TABLE IF NOT EXISTS public.productos (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     nombre TEXT NOT NULL,
@@ -20,7 +30,7 @@ CREATE TABLE IF NOT EXISTS public.productos (
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 3. TABLA DE MESAS
+-- 4. TABLA DE MESAS
 CREATE TABLE IF NOT EXISTS public.mesas (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     numero_mesa INTEGER UNIQUE NOT NULL,
@@ -29,7 +39,7 @@ CREATE TABLE IF NOT EXISTS public.mesas (
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 4. TABLA DE PEDIDOS
+-- 5. TABLA DE PEDIDOS
 CREATE TABLE IF NOT EXISTS public.pedidos (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     mesa_id UUID REFERENCES public.mesas(id) ON DELETE RESTRICT,
@@ -41,7 +51,7 @@ CREATE TABLE IF NOT EXISTS public.pedidos (
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 5. TABLA DETALLE DE PEDIDOS (CON TAMAÑO DE GRANIZADO)
+-- 6. TABLA DETALLE DE PEDIDOS
 CREATE TABLE IF NOT EXISTS public.detalle_pedido (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     pedido_id UUID NOT NULL REFERENCES public.pedidos(id) ON DELETE CASCADE,
@@ -52,32 +62,116 @@ CREATE TABLE IF NOT EXISTS public.detalle_pedido (
     subtotal NUMERIC(10, 2) GENERATED ALWAYS AS (cantidad * precio_unitario) STORED
 );
 
--- 6. INDICES DE RENDIMIENTO
+-- 7. INDICES DE RENDIMIENTO
 CREATE INDEX IF NOT EXISTS idx_pedidos_mesa_id ON public.pedidos(mesa_id);
 CREATE INDEX IF NOT EXISTS idx_pedidos_estado ON public.pedidos(estado);
 CREATE INDEX IF NOT EXISTS idx_pedidos_created_at ON public.pedidos(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_detalle_pedido_pedido_id ON public.detalle_pedido(pedido_id);
 CREATE INDEX IF NOT EXISTS idx_productos_categoria ON public.productos(categoria);
+CREATE INDEX IF NOT EXISTS idx_perfiles_rol ON public.perfiles(rol);
 
--- 7. CONFIGURACION DE REALTIME EN SUPABASE
-ALTER PUBLICATION supabase_realtime ADD TABLE public.pedidos;
+-- 8. CONFIGURACION DE REALTIME EN SUPABASE (BLOQUE SEGURO IDEMPOTENTE)
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_publication_tables 
+        WHERE pubname = 'supabase_realtime' 
+        AND schemaname = 'public' 
+        AND tablename = 'pedidos'
+    ) THEN
+        ALTER PUBLICATION supabase_realtime ADD TABLE public.pedidos;
+    END IF;
+END $$;
 
--- 8. POLÍTICAS RLS
+-- ==============================================================================
+-- TRIGGER PARA CREACION AUTOMATICA DE PERFIL AL CREAR USUARIO EN SUPABASE AUTH
+-- ==============================================================================
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS TRIGGER AS $$
+BEGIN
+    INSERT INTO public.perfiles (id, email, nombre, rol)
+    VALUES (
+        NEW.id,
+        NEW.email,
+        COALESCE(NEW.raw_user_meta_data->>'nombre', SPLIT_PART(NEW.email, '@', 1)),
+        COALESCE(NEW.raw_user_meta_data->>'rol', 'empleado')
+    )
+    ON CONFLICT (id) DO UPDATE SET email = EXCLUDED.email;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+CREATE TRIGGER on_auth_user_created
+    AFTER INSERT ON auth.users
+    FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+
+-- ==============================================================================
+-- POLÍTICAS DE SEGURIDAD RLS (IDEMPOTENTES Y SEGURAS)
+-- ==============================================================================
+ALTER TABLE public.perfiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.productos ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.mesas ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.pedidos ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.detalle_pedido ENABLE ROW LEVEL SECURITY;
 
+-- --- LIMPIEZA Y RECREACION DE POLÍTICAS DE PERFILES ---
+DROP POLICY IF EXISTS "Permitir a usuarios ver su propio perfil" ON public.perfiles;
+CREATE POLICY "Permitir a usuarios ver su propio perfil" 
+ON public.perfiles FOR SELECT 
+USING (auth.uid() = id);
+
+DROP POLICY IF EXISTS "Permitir a administradores ver todos los perfiles" ON public.perfiles;
+CREATE POLICY "Permitir a administradores ver todos los perfiles" 
+ON public.perfiles FOR SELECT 
+USING (
+    EXISTS (SELECT 1 FROM public.perfiles WHERE id = auth.uid() AND rol = 'admin')
+);
+
+DROP POLICY IF EXISTS "Permitir a administradores actualizar perfiles" ON public.perfiles;
+CREATE POLICY "Permitir a administradores actualizar perfiles" 
+ON public.perfiles FOR UPDATE 
+USING (
+    EXISTS (SELECT 1 FROM public.perfiles WHERE id = auth.uid() AND rol = 'admin')
+);
+
+-- --- LIMPIEZA Y RECREACION DE POLÍTICAS DE PRODUCTOS Y MESAS ---
+DROP POLICY IF EXISTS "Permitir lectura publica de productos" ON public.productos;
 CREATE POLICY "Permitir lectura publica de productos" ON public.productos FOR SELECT USING (true);
+
+DROP POLICY IF EXISTS "Permitir lectura publica de mesas" ON public.mesas;
 CREATE POLICY "Permitir lectura publica de mesas" ON public.mesas FOR SELECT USING (true);
+
+DROP POLICY IF EXISTS "Solo los administradores modifican productos" ON public.productos;
+CREATE POLICY "Solo los administradores modifican productos" 
+ON public.productos FOR ALL 
+USING (
+    EXISTS (SELECT 1 FROM public.perfiles WHERE id = auth.uid() AND rol = 'admin')
+);
+
+-- --- LIMPIEZA Y RECREACION DE POLÍTICAS DE PEDIDOS ---
+DROP POLICY IF EXISTS "Permitir lectura publica de pedidos" ON public.pedidos;
 CREATE POLICY "Permitir lectura publica de pedidos" ON public.pedidos FOR SELECT USING (true);
+
+DROP POLICY IF EXISTS "Permitir insercion publica de pedidos" ON public.pedidos;
 CREATE POLICY "Permitir insercion publica de pedidos" ON public.pedidos FOR INSERT WITH CHECK (true);
-CREATE POLICY "Permitir actualizacion publica de pedidos" ON public.pedidos FOR UPDATE USING (true);
+
+DROP POLICY IF EXISTS "Permitir actualizacion de pedidos no facturados" ON public.pedidos;
+CREATE POLICY "Permitir actualizacion de pedidos no facturados" 
+ON public.pedidos FOR UPDATE 
+USING (
+    estado != 'facturado' OR 
+    EXISTS (SELECT 1 FROM public.perfiles WHERE id = auth.uid() AND rol = 'admin')
+);
+
+DROP POLICY IF EXISTS "Permitir lectura publica de detalle_pedido" ON public.detalle_pedido;
 CREATE POLICY "Permitir lectura publica de detalle_pedido" ON public.detalle_pedido FOR SELECT USING (true);
+
+DROP POLICY IF EXISTS "Permitir insercion publica de detalle_pedido" ON public.detalle_pedido;
 CREATE POLICY "Permitir insercion publica de detalle_pedido" ON public.detalle_pedido FOR INSERT WITH CHECK (true);
 
 -- ==============================================================================
--- DATOS SEMILLA EXACTOS DEL MENÚ "GRANIZADOS & FLOW"
+-- DATOS SEMILLA EXACTOS DEL MENÚ "GRANIZADOS & FLOW - A LO MÁS AGOGO"
 -- ==============================================================================
 
 -- Mesas 1 a 10
@@ -86,7 +180,7 @@ INSERT INTO public.mesas (numero_mesa, estado) VALUES
 (6, 'disponible'), (7, 'disponible'), (8, 'disponible'), (9, 'disponible'), (10, 'disponible')
 ON CONFLICT (numero_mesa) DO NOTHING;
 
--- PRODUCTOS CON LICOR (8oz: $12k, 12oz: $16k, 24oz: $24k, 100oz Nevera: $70k)
+-- PRODUCTOS CON LICOR
 INSERT INTO public.productos (nombre, categoria, ingredientes, precio_8oz, precio_12oz, precio_24oz, precio_100oz, imagen_url) VALUES
 ('BLUE AGOGO', 'con_licor', 'Tequila - Citrile - Mora', 12000, 16000, 24000, 70000, 'https://images.unsplash.com/photo-1536935338788-846bb9981813?auto=format&fit=crop&w=400&q=80'),
 ('FOUR LOKO GOLD', 'con_licor', 'Naranja - Four Loko', 12000, 16000, 24000, 70000, 'https://images.unsplash.com/photo-1551024709-8f23befc6f87?auto=format&fit=crop&w=400&q=80'),
@@ -105,7 +199,7 @@ INSERT INTO public.productos (nombre, categoria, ingredientes, precio_8oz, preci
 ('CANABIS', 'con_licor', 'Extracto de CBD - Fresa - Whisky - Hierba Buena', 12000, 16000, 24000, 70000, 'https://images.unsplash.com/photo-1513558161293-cdaf765ed2fd?auto=format&fit=crop&w=400&q=80'),
 ('VODKA BLUE', 'con_licor', 'Sandía - Coco - Vodka', 12000, 16000, 24000, 70000, 'https://images.unsplash.com/photo-1536935338788-846bb9981813?auto=format&fit=crop&w=400&q=80');
 
--- PRODUCTOS SIN LICOR (8oz: $10k, 12oz: $14k, 24oz: $20k, 100oz Nevera: $60k)
+-- PRODUCTOS SIN LICOR
 INSERT INTO public.productos (nombre, categoria, ingredientes, precio_8oz, precio_12oz, precio_24oz, precio_100oz, imagen_url) VALUES
 ('BOM BOM BUM', 'sin_licor', 'Sabor Dulce Bom Bom Bum Frutal', 10000, 14000, 20000, 60000, 'https://images.unsplash.com/photo-1572490122747-3968b75cc699?auto=format&fit=crop&w=400&q=80'),
 ('MORA AZUL', 'sin_licor', 'Granizado Mora Azul Refrescante', 10000, 14000, 20000, 60000, 'https://images.unsplash.com/photo-1536935338788-846bb9981813?auto=format&fit=crop&w=400&q=80'),
@@ -114,7 +208,7 @@ INSERT INTO public.productos (nombre, categoria, ingredientes, precio_8oz, preci
 ('CEREZA', 'sin_licor', 'Cereza Roja Tropical', 10000, 14000, 20000, 60000, 'https://images.unsplash.com/photo-1572490122747-3968b75cc699?auto=format&fit=crop&w=400&q=80'),
 ('MARACUMANGO', 'sin_licor', 'Mezcla Maracuyá y Mango Tropical', 10000, 14000, 20000, 60000, 'https://images.unsplash.com/photo-1553530666-ba11a7da3888?auto=format&fit=crop&w=400&q=80');
 
--- PRODUCTOS CREMOSOS (8oz: $14k, 12oz: $18k, 24oz: $25k, 100oz Nevera: $65k)
+-- PRODUCTOS CREMOSOS
 INSERT INTO public.productos (nombre, categoria, ingredientes, precio_8oz, precio_12oz, precio_24oz, precio_100oz, imagen_url) VALUES
 ('BAILEYS', 'cremoso', 'Crema de café - Whisky', 14000, 18000, 25000, 65000, 'https://images.unsplash.com/photo-1572490122747-3968b75cc699?auto=format&fit=crop&w=400&q=80'),
 ('SABOR PLAYERO', 'cremoso', 'Crema de coco - Ron Blanco', 14000, 18000, 25000, 65000, 'https://images.unsplash.com/photo-1546171753-97d7676e4602?auto=format&fit=crop&w=400&q=80'),
