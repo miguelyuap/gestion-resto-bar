@@ -276,8 +276,8 @@ const MOCK_PRODUCTS = [
     categoria: 'cremoso',
     ingredientes: 'Crema de café - Whisky',
     precio_8oz: 14000,
-    precio_18oz: 18000,
-    precio_25oz: 25000,
+    precio_12oz: 18000,
+    precio_24oz: 25000,
     precio_100oz: 65000,
     activo: true,
     imagen_url: 'https://images.unsplash.com/photo-1572490122747-3968b75cc699?auto=format&fit=crop&w=400&q=80'
@@ -288,8 +288,8 @@ const MOCK_PRODUCTS = [
     categoria: 'cremoso',
     ingredientes: 'Crema de coco - Ron Blanco',
     precio_8oz: 14000,
-    precio_18oz: 18000,
-    precio_25oz: 25000,
+    precio_12oz: 18000,
+    precio_24oz: 25000,
     precio_100oz: 65000,
     activo: true,
     imagen_url: 'https://images.unsplash.com/photo-1546171753-97d7676e4602?auto=format&fit=crop&w=400&q=80'
@@ -300,8 +300,8 @@ const MOCK_PRODUCTS = [
     categoria: 'cremoso',
     ingredientes: 'Sabor Alpinito - Whisky',
     precio_8oz: 14000,
-    precio_18oz: 18000,
-    precio_25oz: 25000,
+    precio_12oz: 18000,
+    precio_24oz: 25000,
     precio_100oz: 65000,
     activo: true,
     imagen_url: 'https://images.unsplash.com/photo-1513558161293-cdaf765ed2fd?auto=format&fit=crop&w=400&q=80'
@@ -312,8 +312,8 @@ const MOCK_PRODUCTS = [
     categoria: 'cremoso',
     ingredientes: 'Sabor Alpinito - Vodka',
     precio_8oz: 14000,
-    precio_18oz: 18000,
-    precio_25oz: 25000,
+    precio_12oz: 18000,
+    precio_24oz: 25000,
     precio_100oz: 65000,
     activo: true,
     imagen_url: 'https://images.unsplash.com/photo-1553530666-ba11a7da3888?auto=format&fit=crop&w=400&q=80'
@@ -333,7 +333,6 @@ const notifyMockListeners = (event, payload) => {
   mockListeners.forEach(fn => fn(event, payload));
 };
 
-// Helper para validar UUID v4 de PostgreSQL
 const isUuidFormat = (str) => {
   return typeof str === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
 };
@@ -357,6 +356,70 @@ export const apiService = {
       }
     }
     return MOCK_PRODUCTS;
+  },
+
+  // Helper interno infalible para obtener siempre un UUID de PostgreSQL válido para un producto
+  async getValidProductoUuid(productoObj) {
+    if (!productoObj) return null;
+
+    if (isUuidFormat(productoObj.id)) {
+      return productoObj.id;
+    }
+
+    if (isSupabaseConfigured && supabase) {
+      try {
+        // 1. Buscar producto por nombre en Supabase DB
+        const { data: matched } = await supabase
+          .from('productos')
+          .select('id')
+          .ilike('nombre', productoObj.nombre.trim())
+          .limit(1)
+          .maybeSingle();
+
+        if (matched && isUuidFormat(matched.id)) {
+          return matched.id;
+        }
+
+        // 2. Si no existe por nombre, crearlo automáticamente en Supabase para obtener su UUID
+        const { data: newProd, error: errCreate } = await supabase
+          .from('productos')
+          .insert([
+            {
+              nombre: productoObj.nombre,
+              categoria: productoObj.categoria || 'con_licor',
+              ingredientes: productoObj.ingredientes || '',
+              precio_8oz: productoObj.precio_8oz || 12000,
+              precio_12oz: productoObj.precio_12oz || 16000,
+              precio_24oz: productoObj.precio_24oz || 24000,
+              precio_100oz: productoObj.precio_100oz || 70000,
+              activo: true,
+              imagen_url: productoObj.imagen_url || ''
+            }
+          ])
+          .select('id')
+          .single();
+
+        if (!errCreate && newProd && isUuidFormat(newProd.id)) {
+          return newProd.id;
+        }
+
+        // 3. Fallback de respaldo: obtener el primer producto activo existente
+        const { data: firstProd } = await supabase
+          .from('productos')
+          .select('id')
+          .eq('activo', true)
+          .limit(1)
+          .maybeSingle();
+
+        if (firstProd && isUuidFormat(firstProd.id)) {
+          return firstProd.id;
+        }
+      } catch (err) {
+        console.warn('Error resolviendo o creando UUID de producto en Supabase:', err);
+      }
+    }
+
+    return null;
   },
 
   // 2. OBTENER MESAS
@@ -398,45 +461,53 @@ export const apiService = {
     });
   },
 
-  // 3. CREAR PEDIDO NUEVO EN SUPABASE
+  // 3. CREAR PEDIDO NUEVO EN SUPABASE CON INSERCIÓN GARANTIZADA DE DETALLES
   async crearPedido({ mesa_id, selectedMesaNum, items, total, notas, meseroNombre }) {
     const notasCompletas = meseroNombre 
       ? `[Mesero: ${meseroNombre}] ${notas || ''}`.trim()
       : (notas || '');
 
-    if (isSupabaseConfigured) {
+    if (isSupabaseConfigured && supabase) {
       try {
         let targetMesaId = mesa_id;
 
-        // Si mesa_id no es un UUID válido de PostgreSQL, buscar el UUID real en Supabase por numero_mesa
+        // 1. Resolver o crear UUID válido para la mesa
         if (!isUuidFormat(targetMesaId)) {
-          const mesaNum = selectedMesaNum || 1;
-          const { data: mesaDb } = await supabase
+          const mesaNum = parseInt(selectedMesaNum || 1, 10);
+          const { data: mesaDb, error: errMesa } = await supabase
             .from('mesas')
             .select('id')
-            .eq('numero_mesa', parseInt(mesaNum))
-            .single();
+            .eq('numero_mesa', mesaNum)
+            .maybeSingle();
 
-          if (mesaDb) {
+          if (errMesa) {
+            console.error('❌ [Supabase] Error buscando mesa:', errMesa);
+          }
+
+          if (mesaDb && isUuidFormat(mesaDb.id)) {
             targetMesaId = mesaDb.id;
           } else {
-            // Auto-crear la mesa en Supabase si no existía aún
-            const { data: newMesa } = await supabase
+            const { data: newMesa, error: errNewMesa } = await supabase
               .from('mesas')
-              .insert([{ numero_mesa: parseInt(mesaNum), estado: 'ocupada' }])
-              .select()
+              .insert([{ numero_mesa: mesaNum, estado: 'ocupada' }])
+              .select('id')
               .single();
-            if (newMesa) targetMesaId = newMesa.id;
+
+            if (errNewMesa) {
+              console.error('❌ [Supabase Error] Falló creación de mesa:', errNewMesa);
+              throw new Error(`Error vinculando Mesa #${mesaNum}: ${errNewMesa.message}`);
+            }
+            targetMesaId = newMesa.id;
           }
         }
 
-        // Insertar encabezado del pedido en Supabase
+        // 2. Insertar encabezado del pedido en Supabase
         const { data: pedido, error: errPedido } = await supabase
           .from('pedidos')
           .insert([
             {
               mesa_id: targetMesaId,
-              total,
+              total: Number(total),
               estado: 'pendiente',
               notas: notasCompletas
             }
@@ -445,42 +516,72 @@ export const apiService = {
           .single();
 
         if (errPedido) {
-          console.error('❌ Error de Supabase al insertar pedido:', errPedido);
+          console.error('❌ [Supabase Error] Error al insertar pedido:', {
+            code: errPedido.code,
+            message: errPedido.message,
+            details: errPedido.details,
+            hint: errPedido.hint
+          });
           alert(`⚠️ Error de Supabase al guardar pedido: ${errPedido.message} (Código: ${errPedido.code})`);
-        } else if (pedido) {
-          // Obtener lista de productos de Supabase para mapear UUIDs reales
-          const dbProducts = await this.getProductos();
+          throw errPedido;
+        }
 
-          const detalles = items.map(item => {
-            let realProdId = item.producto.id;
-            if (!isUuidFormat(realProdId)) {
-              const matched = dbProducts.find(p => p.nombre.toLowerCase() === item.producto.nombre.toLowerCase());
-              if (matched) realProdId = matched.id;
+        if (pedido) {
+          // 3. Construir array de detalles resolviendo UUIDs reales de PostgreSQL
+          const detalles = [];
+          for (const item of items) {
+            const realProdId = await this.getValidProductoUuid(item.producto);
+
+            if (!realProdId) {
+              console.error('⚠️ [Supabase] No se pudo resolver producto_id UUID para:', item.producto?.nombre);
+              continue;
             }
 
-            return {
+            // Normalizar tamano para respetar restriccion CHECK (tamano IN ('8oz', '12oz', '24oz', '100oz'))
+            let cleanTamano = String(item.tamano || '12oz').trim();
+            if (!['8oz', '12oz', '24oz', '100oz'].includes(cleanTamano)) {
+              if (cleanTamano.includes('8')) cleanTamano = '8oz';
+              else if (cleanTamano.includes('12')) cleanTamano = '12oz';
+              else if (cleanTamano.includes('24')) cleanTamano = '24oz';
+              else cleanTamano = '100oz';
+            }
+
+            detalles.push({
               pedido_id: pedido.id,
               producto_id: realProdId,
-              tamano: item.tamano,
-              cantidad: item.cantidad,
-              precio_unitario: item.precio_unitario
-            };
-          });
+              tamano: cleanTamano,
+              cantidad: Math.max(1, parseInt(item.cantidad, 10)),
+              precio_unitario: Number(item.precio_unitario)
+            });
+          }
 
-          const { error: errDetalle } = await supabase.from('detalle_pedido').insert(detalles);
-          if (errDetalle) console.error('Error insertando detalle_pedido:', errDetalle);
+          // 4. Insertar detalles vinculados al pedido_id
+          if (detalles.length > 0) {
+            const { error: errDetalle } = await supabase.from('detalle_pedido').insert(detalles);
+            if (errDetalle) {
+              console.error('❌ [Supabase Error] Error en tabla detalle_pedido:', {
+                code: errDetalle.code,
+                message: errDetalle.message,
+                details: errDetalle.details,
+                hint: errDetalle.hint
+              });
+              alert(`⚠️ Error al guardar detalle_pedido en Supabase: ${errDetalle.message} (Código: ${errDetalle.code})`);
+              throw errDetalle;
+            }
+          }
 
-          // Actualizar estado de la mesa a 'ocupada'
+          // 5. Actualizar estado de la mesa a 'ocupada'
           await supabase.from('mesas').update({ estado: 'ocupada' }).eq('id', targetMesaId);
 
           return pedido;
         }
       } catch (err) {
-        console.error('Excepción al crear pedido en Supabase:', err);
+        console.error('❌ Excepción al crear pedido en Supabase:', err);
+        throw err;
       }
     }
 
-    // Mock Fallback local
+    // Fallback local únicamente cuando Supabase NO está configurado
     const newPedido = {
       id: 'ped-' + Date.now(),
       mesa_id,
@@ -506,39 +607,63 @@ export const apiService = {
 
   // 4. ADICIONAR A PEDIDO EXISTENTE EN SUPABASE
   async adicionarAPedidoExistente({ pedidoId, items, montoAdicional, notas }) {
-    if (isSupabaseConfigured) {
+    if (isSupabaseConfigured && supabase) {
       try {
         if (isUuidFormat(pedidoId)) {
-          const { data: pedidoActual } = await supabase
+          const { data: pedidoActual, error: errFetch } = await supabase
             .from('pedidos')
             .select('total, notas')
             .eq('id', pedidoId)
             .single();
 
+          if (errFetch) {
+            console.error('❌ [Supabase Error] Error al consultar pedido para adición:', errFetch);
+            throw errFetch;
+          }
+
           if (pedidoActual) {
             const nuevoTotal = Number(pedidoActual.total) + Number(montoAdicional);
             const notasActualizadas = notas ? `${pedidoActual.notas || ''} | Adición: ${notas}` : pedidoActual.notas;
 
-            const dbProducts = await this.getProductos();
-
-            const detalles = items.map(item => {
-              let realProdId = item.producto.id;
-              if (!isUuidFormat(realProdId)) {
-                const matched = dbProducts.find(p => p.nombre.toLowerCase() === item.producto.nombre.toLowerCase());
-                if (matched) realProdId = matched.id;
+            const detalles = [];
+            for (const item of items) {
+              const realProdId = await this.getValidProductoUuid(item.producto);
+              if (!realProdId) {
+                console.error('⚠️ [Supabase] No se pudo resolver producto_id UUID para adición:', item.producto?.nombre);
+                continue;
               }
-              return {
+
+              let cleanTamano = String(item.tamano || '12oz').trim();
+              if (!['8oz', '12oz', '24oz', '100oz'].includes(cleanTamano)) {
+                if (cleanTamano.includes('8')) cleanTamano = '8oz';
+                else if (cleanTamano.includes('12')) cleanTamano = '12oz';
+                else if (cleanTamano.includes('24')) cleanTamano = '24oz';
+                else cleanTamano = '100oz';
+              }
+
+              detalles.push({
                 pedido_id: pedidoId,
                 producto_id: realProdId,
-                tamano: item.tamano,
-                cantidad: item.cantidad,
-                precio_unitario: item.precio_unitario
-              };
-            });
+                tamano: cleanTamano,
+                cantidad: Math.max(1, parseInt(item.cantidad, 10)),
+                precio_unitario: Number(item.precio_unitario)
+              });
+            }
 
-            await supabase.from('detalle_pedido').insert(detalles);
+            if (detalles.length > 0) {
+              const { error: errDetalle } = await supabase.from('detalle_pedido').insert(detalles);
+              if (errDetalle) {
+                console.error('❌ [Supabase Error] Error insertando adición en detalle_pedido:', {
+                  code: errDetalle.code,
+                  message: errDetalle.message,
+                  details: errDetalle.details
+                });
+                alert(`⚠️ Error al guardar adición en Supabase: ${errDetalle.message}`);
+                throw errDetalle;
+              }
+            }
 
-            const { data: pedidoUpd } = await supabase
+            const { data: pedidoUpd, error: errUpd } = await supabase
               .from('pedidos')
               .update({
                 total: nuevoTotal,
@@ -550,15 +675,20 @@ export const apiService = {
               .select()
               .single();
 
+            if (errUpd) {
+              console.error('❌ [Supabase Error] Error actualizando total del pedido:', errUpd);
+              throw errUpd;
+            }
+
             if (pedidoUpd) return pedidoUpd;
           }
         }
       } catch (err) {
-        console.error('Error adicionando a pedido en Supabase:', err);
+        console.error('❌ Excepción adicionando a pedido en Supabase:', err);
+        throw err;
       }
     }
 
-    // Mock Mode
     const index = mockOrders.findIndex(o => o.id === pedidoId);
     if (index !== -1) {
       const order = mockOrders[index];
@@ -587,18 +717,7 @@ export const apiService = {
       try {
         let query = supabase
           .from('pedidos')
-          .select(`
-            *,
-            mesas (numero_mesa),
-            detalle_pedido (
-              id,
-              tamano,
-              cantidad,
-              precio_unitario,
-              subtotal,
-              productos (id, nombre, categoria, ingredientes)
-            )
-          `)
+          .select('*, mesas(numero_mesa), detalle_pedido(*, productos(*))')
           .order('created_at', { ascending: false });
 
         if (filtros.mesa_id && isUuidFormat(filtros.mesa_id)) {
@@ -609,7 +728,28 @@ export const apiService = {
         }
 
         const { data, error } = await query;
-        if (!error && data) return data;
+        if (!error && data) {
+          return data;
+        }
+
+        // Consulta de respaldo limpia por ID
+        const { data: basePedidos } = await supabase
+          .from('pedidos')
+          .select('*, mesas(numero_mesa)')
+          .order('created_at', { ascending: false });
+
+        if (basePedidos && basePedidos.length > 0) {
+          const ids = basePedidos.map(p => p.id);
+          const { data: todosDetalles } = await supabase
+            .from('detalle_pedido')
+            .select('*, productos(*)')
+            .in('pedido_id', ids);
+
+          return basePedidos.map(p => ({
+            ...p,
+            detalle_pedido: todosDetalles ? todosDetalles.filter(d => d.pedido_id === p.id) : []
+          }));
+        }
       } catch (err) {
         console.error('Error obteniendo pedidos de Supabase:', err);
       }
@@ -638,7 +778,10 @@ export const apiService = {
           .select()
           .single();
 
-        if (!error && data) {
+        if (error) {
+          console.error('❌ Error de Supabase al actualizar estado del pedido:', error);
+          alert(`⚠️ Error de Supabase al cambiar estado: ${error.message} (${error.code})`);
+        } else if (data) {
           if (nuevoEstado === 'facturado') {
             const { data: pedidoObj } = await supabase
               .from('pedidos')
@@ -687,18 +830,7 @@ export const apiService = {
             async (payload) => {
               const { data } = await supabase
                 .from('pedidos')
-                .select(`
-                  *,
-                  mesas (numero_mesa),
-                  detalle_pedido (
-                    id,
-                    tamano,
-                    cantidad,
-                    precio_unitario,
-                    subtotal,
-                    productos (id, nombre, categoria, ingredientes)
-                  )
-                `)
+                .select('*, mesas(numero_mesa), detalle_pedido(*, productos(*))')
                 .eq('id', payload.new.id)
                 .single();
 

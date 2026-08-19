@@ -53,7 +53,7 @@ export function ClientMenuView({ mesaNum }) {
           <div>
             <div className="flex items-center gap-2 mb-2">
               <span className="px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 text-xs font-black uppercase tracking-wider border border-emerald-500/40">
-                GRANIZADOS & FLOW 🍹
+                Alo Mas Agogo 🍹
               </span>
               {mesaNum && (
                 <span className="px-3 py-1 rounded-full bg-pink-500/20 text-pink-300 text-xs font-black uppercase tracking-wider border border-pink-500/40">

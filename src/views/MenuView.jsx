@@ -191,7 +191,7 @@ export function MenuView({ initialMesaNum }) {
           <div>
             <div className="flex items-center gap-2 mb-2">
               <span className="px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 text-xs font-black uppercase tracking-wider border border-emerald-500/40">
-                GRANIZADOS & FLOW 🍹
+                Alo Mas Agogo 🍹
               </span>
               {initialMesaNum && (
                 <span className="px-3 py-1 rounded-full bg-pink-500/20 text-pink-300 text-xs font-black uppercase tracking-wider border border-pink-500/40">
@@ -243,7 +243,7 @@ export function MenuView({ initialMesaNum }) {
           </div>
           <div>
             <h4 className="text-xs font-black text-emerald-300 uppercase tracking-wide">
-              Menú Informativo de Consulta {initialMesaNum ? `(Mesa #${initialMesaNum})` : ''}
+              Menú{initialMesaNum ? `(Mesa #${initialMesaNum})` : ''}
             </h4>
             <p className="text-xs text-slate-300 mt-0.5 font-medium">
               Revisa nuestros sabores y precios por tamaño. Cuando el mesero llegue a tu mesa, indícale qué bebida deseas tomar.

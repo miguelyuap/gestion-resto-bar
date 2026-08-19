@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Lock, Mail, ShieldAlert, Sparkles, LogIn, UserCheck } from 'lucide-react';
+import { Lock, Mail, ShieldAlert, LogIn } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 export function LoginView({ onLoginSuccess }) {
@@ -31,27 +31,6 @@ export function LoginView({ onLoginSuccess }) {
     }
   };
 
-  const handleQuickLogin = async (role) => {
-    const testEmail = role === 'admin' ? 'caja.admin@agogo.com' : 'mesero.carlos@agogo.com';
-    const testPassword = 'Password123!';
-    setEmail(testEmail);
-    setPassword(testPassword);
-    
-    try {
-      setErrorMsg('');
-      setIsSubmitting(true);
-      const res = await login(testEmail, testPassword);
-      if (onLoginSuccess) {
-        onLoginSuccess(res.profile);
-      }
-    } catch (err) {
-      console.error('Error en login rápido:', err);
-      setErrorMsg(err.message || 'Error al conectar.');
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
   return (
     <div className="min-h-[80vh] flex items-center justify-center p-4">
       <div className="w-full max-w-md bg-[#080c14] border border-emerald-500/30 rounded-3xl p-8 shadow-2xl glow-emerald relative overflow-hidden">
@@ -73,7 +52,7 @@ export function LoginView({ onLoginSuccess }) {
               Acceso Restringido al Personal
             </span>
             <h2 className="text-2xl font-black text-white mt-2">
-              GRANIZADOS & FLOW
+              Alo Mas Agogo
             </h2>
             <p className="text-xs text-slate-400 font-medium mt-0.5">
               Inicia sesión como Administrador o Mesero
@@ -129,31 +108,6 @@ export function LoginView({ onLoginSuccess }) {
               <span>{isSubmitting ? 'Verificando...' : 'Iniciar Sesión'}</span>
             </button>
           </form>
-
-          {/* Accesos Rápidos de Prueba */}
-          <div className="mt-8 pt-6 border-t border-slate-800">
-            <span className="block text-center text-[10px] text-slate-500 font-bold uppercase tracking-wider mb-3">
-              ⚡ Ingreso Rápido de Prueba por Rol:
-            </span>
-
-            <div className="grid grid-cols-2 gap-3">
-              <button
-                onClick={() => handleQuickLogin('empleado')}
-                className="py-2.5 px-3 rounded-2xl bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-emerald-500/40 text-xs font-bold text-emerald-300 flex items-center justify-center gap-1.5 transition-all"
-              >
-                <UserCheck className="w-3.5 h-3.5" />
-                <span>Mesero (Empleado)</span>
-              </button>
-
-              <button
-                onClick={() => handleQuickLogin('admin')}
-                className="py-2.5 px-3 rounded-2xl bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-pink-500/40 text-xs font-bold text-pink-300 flex items-center justify-center gap-1.5 transition-all"
-              >
-                <Sparkles className="w-3.5 h-3.5" />
-                <span>Cajero (Admin)</span>
-              </button>
-            </div>
-          </div>
 
         </div>
 

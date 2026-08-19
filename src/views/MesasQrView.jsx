@@ -59,7 +59,7 @@ export function MesasQrView() {
             >
               {/* Encabezado Sticker */}
               <div className="w-full pb-3 border-b border-slate-800 mb-4 flex items-center justify-between">
-                <span className="text-xs font-bold text-slate-400">GST RESTO-BAR</span>
+                <span className="text-xs font-bold text-slate-400">ALO MAS AGOGO</span>
                 <span className="px-2.5 py-0.5 rounded-full bg-pink-500/20 text-pink-300 font-extrabold text-xs border border-pink-500/30">
                   MESA #{num}
                 </span>

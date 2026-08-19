@@ -6,10 +6,11 @@ import { ClientMenuView } from './views/ClientMenuView';
 import { MeseroView } from './views/MeseroView';
 import { CajaView } from './views/CajaView';
 import { MesasQrView } from './views/MesasQrView';
+import { UsuariosView } from './views/UsuariosView';
 
 function AppContent() {
   const { profile } = useAuth();
-  const [activeTab, setActiveTab] = useState('menu');
+  const [activeTab, setActiveTab] = useState('mesero');
   const [currentMesaNum, setCurrentMesaNum] = useState(null);
   const [isQRClient, setIsQRClient] = useState(false);
 
@@ -25,18 +26,13 @@ function AppContent() {
       return;
     }
 
-    // Navegación interna por rutas
-    const path = window.location.pathname;
-    if (path.includes('/caja')) {
+    // Ajustar tab inicial por defecto según el rol del usuario
+    if (profile?.rol === 'admin') {
       setActiveTab('caja');
-    } else if (path.includes('/mesero')) {
-      setActiveTab('mesero');
-    } else if (path.includes('/mesas')) {
-      setActiveTab('mesas');
     } else {
       setActiveTab('mesero');
     }
-  }, []);
+  }, [profile]);
 
   // Redirección posterior al inicio de sesión basada en el rol del usuario
   const handleRoleRedirect = (userProfile, targetTab = null) => {
@@ -46,9 +42,9 @@ function AppContent() {
     }
 
     if (userProfile?.rol === 'admin') {
-      setActiveTab('caja'); // Redirigir al Dashboard de Caja si es Admin
+      setActiveTab('caja'); // Redirigir a Caja si es Administrador
     } else {
-      setActiveTab('mesero'); // Redirigir a la vista de Toma de Pedidos si es Empleado
+      setActiveTab('mesero'); // Redirigir a Toma de Pedidos si es Empleado
     }
   };
 
@@ -67,9 +63,9 @@ function AppContent() {
           <ClientMenuView mesaNum={currentMesaNum} />
         )}
 
-        {/* Vista de Toma de Pedidos (Permitida para 'admin' y 'empleado') */}
+        {/* Vista de Toma de Pedidos (Exclusiva para 'empleado') */}
         {!isQRClient && activeTab === 'mesero' && (
-          <ProtectedRoute allowedRoles={['admin', 'empleado']} onRedirect={handleRoleRedirect}>
+          <ProtectedRoute allowedRoles={['empleado']} onRedirect={handleRoleRedirect}>
             <MeseroView />
           </ProtectedRoute>
         )}
@@ -78,6 +74,13 @@ function AppContent() {
         {!isQRClient && activeTab === 'caja' && (
           <ProtectedRoute allowedRoles={['admin']} onRedirect={handleRoleRedirect}>
             <CajaView />
+          </ProtectedRoute>
+        )}
+
+        {/* Vista de Gestión de Usuarios y Personal (Exclusiva para 'admin') */}
+        {!isQRClient && activeTab === 'usuarios' && (
+          <ProtectedRoute allowedRoles={['admin']} onRedirect={handleRoleRedirect}>
+            <UsuariosView />
           </ProtectedRoute>
         )}
 
@@ -90,7 +93,7 @@ function AppContent() {
       </main>
 
       <footer className="py-6 border-t border-slate-800/80 text-center text-xs text-slate-500">
-        <p>GRANIZADOS & FLOW &copy; {new Date().getFullYear()} &bull; A lo Más Agogo Granizados</p>
+        <p>Alo Mas Agogo &copy; {new Date().getFullYear()} &bull; GST-Software</p>
       </footer>
     </div>
   );

@@ -94,9 +94,13 @@ BEGIN
         NEW.id,
         NEW.email,
         COALESCE(NEW.raw_user_meta_data->>'nombre', SPLIT_PART(NEW.email, '@', 1)),
-        COALESCE(NEW.raw_user_meta_data->>'rol', 'empleado')
+        COALESCE(
+          NEW.raw_user_meta_data->>'rol',
+          CASE WHEN NEW.email LIKE '%admin%' THEN 'admin' ELSE 'empleado' END
+        )
     )
-    ON CONFLICT (id) DO UPDATE SET email = EXCLUDED.email;
+    ON CONFLICT (id) DO UPDATE SET 
+        email = EXCLUDED.email;
     RETURN NEW;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
@@ -107,7 +111,22 @@ CREATE TRIGGER on_auth_user_created
     FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
 
 -- ==============================================================================
--- POLÍTICAS DE SEGURIDAD RLS (IDEMPOTENTES Y SEGURAS)
+-- ==============================================================================
+-- FUNCIÓN AUXILIAR SECURITY DEFINER PARA EVITAR RECURSIÓN INFINITA (42P17)
+-- ==============================================================================
+CREATE OR REPLACE FUNCTION public.es_admin()
+RETURNS BOOLEAN AS $$
+BEGIN
+  RETURN EXISTS (
+    SELECT 1 
+    FROM public.perfiles 
+    WHERE id = auth.uid() AND rol = 'admin'
+  );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
+
+-- ==============================================================================
+-- POLÍTICAS DE SEGURIDAD RLS (IDEMPOTENTES Y SEGURAS SIN RECURSIÓN)
 -- ==============================================================================
 ALTER TABLE public.perfiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.productos ENABLE ROW LEVEL SECURITY;
@@ -117,37 +136,38 @@ ALTER TABLE public.detalle_pedido ENABLE ROW LEVEL SECURITY;
 
 -- --- LIMPIEZA Y RECREACION DE POLÍTICAS DE PERFILES ---
 DROP POLICY IF EXISTS "Permitir a usuarios ver su propio perfil" ON public.perfiles;
+DROP POLICY IF EXISTS "Permitir a administradores ver todos los perfiles" ON public.perfiles;
+DROP POLICY IF EXISTS "Permitir a administradores actualizar perfiles" ON public.perfiles;
+DROP POLICY IF EXISTS "Permitir lectura general de perfiles autenticados" ON public.perfiles;
+
 CREATE POLICY "Permitir a usuarios ver su propio perfil" 
 ON public.perfiles FOR SELECT 
-USING (auth.uid() = id);
+USING (auth.uid() = id OR public.es_admin());
 
-DROP POLICY IF EXISTS "Permitir a administradores ver todos los perfiles" ON public.perfiles;
-CREATE POLICY "Permitir a administradores ver todos los perfiles" 
-ON public.perfiles FOR SELECT 
-USING (
-    EXISTS (SELECT 1 FROM public.perfiles WHERE id = auth.uid() AND rol = 'admin')
-);
-
-DROP POLICY IF EXISTS "Permitir a administradores actualizar perfiles" ON public.perfiles;
 CREATE POLICY "Permitir a administradores actualizar perfiles" 
 ON public.perfiles FOR UPDATE 
-USING (
-    EXISTS (SELECT 1 FROM public.perfiles WHERE id = auth.uid() AND rol = 'admin')
-);
+USING (public.es_admin());
 
 -- --- LIMPIEZA Y RECREACION DE POLÍTICAS DE PRODUCTOS Y MESAS ---
 DROP POLICY IF EXISTS "Permitir lectura publica de productos" ON public.productos;
 CREATE POLICY "Permitir lectura publica de productos" ON public.productos FOR SELECT USING (true);
 
+DROP POLICY IF EXISTS "Permitir insercion de productos" ON public.productos;
+CREATE POLICY "Permitir insercion de productos" ON public.productos FOR INSERT WITH CHECK (true);
+
 DROP POLICY IF EXISTS "Permitir lectura publica de mesas" ON public.mesas;
 CREATE POLICY "Permitir lectura publica de mesas" ON public.mesas FOR SELECT USING (true);
+
+DROP POLICY IF EXISTS "Permitir insercion publica de mesas" ON public.mesas;
+CREATE POLICY "Permitir insercion publica de mesas" ON public.mesas FOR INSERT WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Permitir actualizacion de mesas" ON public.mesas;
+CREATE POLICY "Permitir actualizacion de mesas" ON public.mesas FOR UPDATE USING (true);
 
 DROP POLICY IF EXISTS "Solo los administradores modifican productos" ON public.productos;
 CREATE POLICY "Solo los administradores modifican productos" 
 ON public.productos FOR ALL 
-USING (
-    EXISTS (SELECT 1 FROM public.perfiles WHERE id = auth.uid() AND rol = 'admin')
-);
+USING (public.es_admin());
 
 -- --- LIMPIEZA Y RECREACION DE POLÍTICAS DE PEDIDOS ---
 DROP POLICY IF EXISTS "Permitir lectura publica de pedidos" ON public.pedidos;
@@ -160,10 +180,10 @@ DROP POLICY IF EXISTS "Permitir actualizacion de pedidos no facturados" ON publi
 CREATE POLICY "Permitir actualizacion de pedidos no facturados" 
 ON public.pedidos FOR UPDATE 
 USING (
-    estado != 'facturado' OR 
-    EXISTS (SELECT 1 FROM public.perfiles WHERE id = auth.uid() AND rol = 'admin')
+    estado != 'facturado' OR public.es_admin()
 );
 
+-- --- LIMPIEZA Y RECREACION DE POLÍTICAS DE DETALLE_PEDIDO ---
 DROP POLICY IF EXISTS "Permitir lectura publica de detalle_pedido" ON public.detalle_pedido;
 CREATE POLICY "Permitir lectura publica de detalle_pedido" ON public.detalle_pedido FOR SELECT USING (true);
 

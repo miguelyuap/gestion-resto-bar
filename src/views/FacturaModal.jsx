@@ -71,7 +71,7 @@ export function FacturaModal({ order, onClose, onOrderFacturado }) {
           
           {/* Desglose de Productos */}
           <div>
-            <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Detalle del Consumo (Granizados & Flow)</h4>
+            <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Detalle del Consumo (Alo Mas Agogo)</h4>
             <div className="space-y-2">
               {(order.detalle_pedido || order.detalles || []).map((det, idx) => {
                 const prodNombre = det.productos?.nombre || det.producto?.nombre || 'Granizado';
@@ -203,8 +203,8 @@ export function FacturaModal({ order, onClose, onOrderFacturado }) {
       {/* PLANTILLA DE IMPRESIÓN OCULTA DE TICKET TÉRMICO (80mm POS) */}
       <div id="printable-ticket" className="hidden">
         <div style={{ textAlign: 'center', marginBottom: '10px' }}>
-          <h2 style={{ fontSize: '16px', fontWeight: 'bold', margin: '0' }}>GRANIZADOS & FLOW</h2>
-          <p style={{ margin: '2px 0', fontWeight: 'bold' }}>A lo Más Agogo Granizados</p>
+          <h2 style={{ fontSize: '16px', fontWeight: 'bold', margin: '0' }}>ALO MAS AGOGO</h2>
+          <p style={{ margin: '2px 0', fontWeight: 'bold' }}>Granizados & Bar</p>
           <p style={{ margin: '2px 0' }}>NIT: 901.884.221-0</p>
           <p style={{ margin: '5px 0' }}>--------------------------------</p>
         </div>
