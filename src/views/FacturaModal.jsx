@@ -1,32 +1,29 @@
 import React, { useState } from 'react';
 import { Receipt, Printer, CheckCircle, CreditCard, DollarSign, Smartphone, X } from 'lucide-react';
 import { apiService } from '../services/api';
+import { useAuth } from '../context/AuthContext';
 
-export function FacturaModal({ order, onClose, onOrderFacturado }) {
+export function FacturaModal({ pedido, order, onClose, onFacturado, onOrderFacturado }) {
+  const { negocio, formatCurrency } = useAuth();
+  const activeOrder = pedido || order;
+  const handleFacturadoCallback = onFacturado || onOrderFacturado;
+
   const [metodoPago, setMetodoPago] = useState('efectivo');
   const [propinaPct, setPropinaPct] = useState(10);
   const [isProcessing, setIsProcessing] = useState(false);
 
-  if (!order) return null;
+  if (!activeOrder) return null;
 
-  const formatCOP = (val) => {
-    return new Intl.NumberFormat('es-CO', {
-      style: 'currency',
-      currency: 'COP',
-      maximumFractionDigits: 0
-    }).format(val || 0);
-  };
-
-  const subtotal = order.total || 0;
+  const subtotal = Number(activeOrder.total) || 0;
   const propina = (subtotal * propinaPct) / 100;
   const totalConPropina = subtotal + propina;
 
   const handleCerrarYFacturar = async () => {
     try {
       setIsProcessing(true);
-      await apiService.actualizarEstadoPedido(order.id, 'facturado', metodoPago);
-      if (onOrderFacturado) {
-        onOrderFacturado(order.id);
+      await apiService.actualizarEstadoPedido(activeOrder.id, 'facturado', metodoPago);
+      if (handleFacturadoCallback) {
+        handleFacturadoCallback(activeOrder.id);
       }
       onClose();
     } catch (err) {
@@ -43,18 +40,18 @@ export function FacturaModal({ order, onClose, onOrderFacturado }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
-      <div className="w-full max-w-lg bg-[#0b0f19] border border-slate-800 rounded-3xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
+      <div className="w-full max-w-lg bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
         
         {/* Header de la Factura */}
-        <div className="p-5 border-b border-slate-800 flex items-center justify-between bg-slate-900/50">
+        <div className="p-5 border-b border-slate-800 flex items-center justify-between bg-slate-950">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-cyan-500/20 text-cyan-400 flex items-center justify-center border border-cyan-500/30">
+            <div className="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center border border-emerald-500/20">
               <Receipt className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="font-extrabold text-white text-base">Facturación & Ticket</h3>
+              <h3 className="font-extrabold text-white text-base">Comprobante de Cobro</h3>
               <p className="text-xs text-slate-400">
-                Mesa #{order.mesas?.numero_mesa || order.numero_mesa || '?'} &bull; Pedido #{order.id?.slice(0, 8)}
+                {negocio?.nombre || 'GST Resto Bar'} &bull; Mesa #{activeOrder.mesas?.numero_mesa || activeOrder.numero_mesa || '?'}
               </p>
             </div>
           </div>
@@ -66,15 +63,22 @@ export function FacturaModal({ order, onClose, onOrderFacturado }) {
           </button>
         </div>
 
-        {/* Cuerpo de la Factura (Navegador) */}
+        {/* Cuerpo de la Factura */}
         <div className="p-6 overflow-y-auto space-y-6">
           
+          {/* Encabezado Comercial Tenant */}
+          <div className="text-center pb-3 border-b border-slate-800">
+            <h2 className="font-extrabold text-lg text-white">{negocio?.nombre || 'GST Resto Bar'}</h2>
+            <p className="text-xs text-slate-400">NIT: {negocio?.nit || '901.234.567-8'}</p>
+            <p className="text-[11px] text-emerald-400 font-mono mt-1">Ticket #: {activeOrder.id?.slice(0, 8)}</p>
+          </div>
+
           {/* Desglose de Productos */}
           <div>
-            <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Detalle del Consumo (Alo Mas Agogo)</h4>
+            <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Detalle del Consumo</h4>
             <div className="space-y-2">
-              {(order.detalle_pedido || order.detalles || []).map((det, idx) => {
-                const prodNombre = det.productos?.nombre || det.producto?.nombre || 'Granizado';
+              {(activeOrder.detalle_pedido || activeOrder.detalles || []).map((det, idx) => {
+                const prodNombre = det.productos?.nombre || det.producto?.nombre || 'Bebida';
                 const tamano = det.tamano || '12oz';
                 const cant = det.cantidad || 1;
                 const pUnit = det.precio_unitario || 0;
@@ -89,7 +93,7 @@ export function FacturaModal({ order, onClose, onOrderFacturado }) {
                         <span className="text-[10px] text-slate-400 font-semibold uppercase">{tamano}</span>
                       </div>
                     </div>
-                    <span className="font-bold text-slate-200">{formatCOP(sub)}</span>
+                    <span className="font-bold text-slate-200">{formatCurrency(sub)}</span>
                   </div>
                 );
               })}
@@ -97,92 +101,80 @@ export function FacturaModal({ order, onClose, onOrderFacturado }) {
           </div>
 
           {/* Selector de Propina */}
-          <div className="p-4 rounded-2xl bg-slate-900/60 border border-slate-800">
-            <label className="block text-xs font-bold text-slate-300 mb-2">Propina / Servicio Voluntario:</label>
-            <div className="grid grid-cols-3 gap-2">
-              {[0, 10, 15].map(pct => (
-                <button
-                  key={pct}
-                  onClick={() => setPropinaPct(pct)}
-                  className={`py-2 rounded-xl text-xs font-bold transition-all border ${
-                    propinaPct === pct
-                      ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500'
-                      : 'bg-slate-950 text-slate-400 border-slate-800 hover:border-slate-700'
-                  }`}
-                >
-                  {pct === 0 ? 'Sin Propina' : `${pct}% (${formatCOP((subtotal * pct)/100)})`}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Método de Pago */}
-          <div>
-            <label className="block text-xs font-bold text-slate-300 mb-2">Método de Pago:</label>
-            <div className="grid grid-cols-3 gap-2">
-              <button
-                onClick={() => setMetodoPago('efectivo')}
-                className={`flex items-center justify-center gap-2 p-3 rounded-2xl border text-xs font-bold transition-all ${
-                  metodoPago === 'efectivo'
-                    ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500'
-                    : 'bg-slate-900 text-slate-400 border-slate-800'
-                }`}
-              >
-                <DollarSign className="w-4 h-4" />
-                <span>Efectivo</span>
-              </button>
-
-              <button
-                onClick={() => setMetodoPago('nequi')}
-                className={`flex items-center justify-center gap-2 p-3 rounded-2xl border text-xs font-bold transition-all ${
-                  metodoPago === 'nequi'
-                    ? 'bg-purple-500/20 text-purple-300 border-purple-500'
-                    : 'bg-slate-900 text-slate-400 border-slate-800'
-                }`}
-              >
-                <Smartphone className="w-4 h-4" />
-                <span>Nequi / Davi</span>
-              </button>
-
-              <button
-                onClick={() => setMetodoPago('tarjeta')}
-                className={`flex items-center justify-center gap-2 p-3 rounded-2xl border text-xs font-bold transition-all ${
-                  metodoPago === 'tarjeta'
-                    ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500'
-                    : 'bg-slate-900 text-slate-400 border-slate-800'
-                }`}
-              >
-                <CreditCard className="w-4 h-4" />
-                <span>Tarjeta</span>
-              </button>
+          <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-slate-300">Propina Sugerida:</span>
+              <div className="flex gap-2">
+                {[0, 5, 10, 15].map(pct => (
+                  <button
+                    key={pct}
+                    onClick={() => setPropinaPct(pct)}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all border ${
+                      propinaPct === pct
+                        ? 'bg-emerald-500 text-slate-950 border-emerald-400 font-black'
+                        : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-white'
+                    }`}
+                  >
+                    {pct}%
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
 
           {/* Totales */}
-          <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 space-y-2">
-            <div className="flex justify-between text-xs text-slate-400">
-              <span>Subtotal Consumo:</span>
-              <span className="font-semibold text-slate-200">{formatCOP(subtotal)}</span>
+          <div className="space-y-2 pt-2 border-t border-slate-800 text-xs">
+            <div className="flex justify-between text-slate-400">
+              <span>Subtotal</span>
+              <span>{formatCurrency(subtotal)}</span>
             </div>
-            {propina > 0 && (
-              <div className="flex justify-between text-xs text-slate-400">
-                <span>Propina ({propinaPct}%):</span>
-                <span className="font-semibold text-cyan-400">{formatCOP(propina)}</span>
-              </div>
-            )}
+            <div className="flex justify-between text-slate-400">
+              <span>Propina ({propinaPct}%)</span>
+              <span>{formatCurrency(propina)}</span>
+            </div>
             <div className="flex justify-between text-base font-extrabold text-white pt-2 border-t border-slate-800">
-              <span>TOTAL A COBRAR:</span>
-              <span className="text-emerald-400">{formatCOP(totalConPropina)}</span>
+              <span>Total a Cobrar</span>
+              <span className="text-emerald-400">{formatCurrency(totalConPropina)}</span>
+            </div>
+          </div>
+
+          {/* Métodos de Pago */}
+          <div>
+            <label className="block text-xs font-bold text-slate-300 mb-2">Método de Pago:</label>
+            <div className="grid grid-cols-2 gap-2">
+              {[
+                { id: 'efectivo', label: 'Efectivo', icon: DollarSign },
+                { id: 'nequi', label: 'Nequi', icon: Smartphone },
+                { id: 'daviplata', label: 'Daviplata', icon: Smartphone },
+                { id: 'tarjeta', label: 'Tarjeta', icon: CreditCard }
+              ].map(m => {
+                const Icon = m.icon;
+                const active = metodoPago === m.id;
+                return (
+                  <button
+                    key={m.id}
+                    onClick={() => setMetodoPago(m.id)}
+                    className={`p-3 rounded-xl border flex items-center gap-2.5 text-xs font-bold transition-all ${
+                      active
+                        ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/40'
+                        : 'bg-slate-950 text-slate-400 border-slate-800 hover:text-white'
+                    }`}
+                  >
+                    <Icon className="w-4 h-4" />
+                    <span>{m.label}</span>
+                  </button>
+                );
+              })}
             </div>
           </div>
 
         </div>
 
-        {/* Acciones de Facturación */}
-        <div className="p-5 border-t border-slate-800 bg-slate-900/50 flex items-center justify-between gap-3">
+        {/* Acciones Modal */}
+        <div className="p-5 bg-slate-950 border-t border-slate-800 flex items-center justify-between gap-3">
           <button
             onClick={handlePrint}
-            className="flex-1 py-3 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold rounded-2xl text-xs flex items-center justify-center gap-2 transition-all border border-slate-700"
+            className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold flex items-center gap-2 transition-colors border border-slate-700"
           >
             <Printer className="w-4 h-4" />
             <span>Imprimir Ticket</span>
@@ -191,76 +183,14 @@ export function FacturaModal({ order, onClose, onOrderFacturado }) {
           <button
             onClick={handleCerrarYFacturar}
             disabled={isProcessing}
-            className="flex-1 py-3 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-extrabold rounded-2xl text-xs flex items-center justify-center gap-2 transition-all shadow-lg shadow-emerald-500/20 disabled:opacity-50"
+            className="px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs transition-colors flex items-center gap-2 shadow-md shadow-emerald-500/20 disabled:opacity-50"
           >
             <CheckCircle className="w-4 h-4" />
-            <span>Cerrar y Facturar</span>
+            <span>{isProcessing ? 'Facturando...' : 'Confirmar Cobro'}</span>
           </button>
         </div>
 
       </div>
-
-      {/* PLANTILLA DE IMPRESIÓN OCULTA DE TICKET TÉRMICO (80mm POS) */}
-      <div id="printable-ticket" className="hidden">
-        <div style={{ textAlign: 'center', marginBottom: '10px' }}>
-          <h2 style={{ fontSize: '16px', fontWeight: 'bold', margin: '0' }}>ALO MAS AGOGO</h2>
-          <p style={{ margin: '2px 0', fontWeight: 'bold' }}>Granizados & Bar</p>
-          <p style={{ margin: '2px 0' }}>NIT: 901.884.221-0</p>
-          <p style={{ margin: '5px 0' }}>--------------------------------</p>
-        </div>
-
-        <p><strong>Mesa:</strong> #{order.mesas?.numero_mesa || order.numero_mesa || '?'}</p>
-        <p><strong>Pedido:</strong> {order.id?.slice(0, 8)}</p>
-        <p><strong>Fecha:</strong> {new Date().toLocaleString('es-CO')}</p>
-        <p>--------------------------------</p>
-
-        <table style={{ width: '100%', fontSize: '11px', textAlign: 'left' }}>
-          <thead>
-            <tr>
-              <th>Cant</th>
-              <th>Prod</th>
-              <th style={{ textAlign: 'right' }}>Total</th>
-            </tr>
-          </thead>
-          <tbody>
-            {(order.detalle_pedido || order.detalles || []).map((det, i) => {
-              const pNom = det.productos?.nombre || det.producto?.nombre || 'Producto';
-              const cant = det.cantidad || 1;
-              const sub = det.subtotal || (cant * (det.precio_unitario || 0));
-              return (
-                <tr key={i}>
-                  <td>{cant}x</td>
-                  <td>{pNom.slice(0, 18)}</td>
-                  <td style={{ textAlign: 'right' }}>${sub.toLocaleString('es-CO')}</td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-
-        <p>--------------------------------</p>
-        <p style={{ display: 'flex', justifyContent: 'space-between' }}>
-          <span>Subtotal:</span>
-          <span>${subtotal.toLocaleString('es-CO')}</span>
-        </p>
-        {propina > 0 && (
-          <p style={{ display: 'flex', justifyContent: 'space-between' }}>
-            <span>Propina ({propinaPct}%):</span>
-            <span>${propina.toLocaleString('es-CO')}</span>
-          </p>
-        )}
-        <p style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', fontWeight: 'bold' }}>
-          <span>TOTAL:</span>
-          <span>${totalConPropina.toLocaleString('es-CO')}</span>
-        </p>
-        <p style={{ marginTop: '5px' }}><strong>Método de Pago:</strong> {metodoPago.toUpperCase()}</p>
-        
-        <div style={{ textAlign: 'center', marginTop: '15px' }}>
-          <p>¡Gracias por tu visita!</p>
-          <p>Disfruta tus granizados 🍹</p>
-        </div>
-      </div>
-
     </div>
   );
 }

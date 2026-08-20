@@ -3,10 +3,47 @@ import { supabase, isSupabaseConfigured } from '../lib/supabase';
 
 const AuthContext = createContext();
 
+const DEFAULT_NEGOCIO = {
+  id: '00000000-0000-0000-0000-000000000001',
+  nombre: 'GST Resto Bar',
+  slug: 'gst-resto-bar',
+  nit: '901.234.567-8',
+  moneda: 'COP',
+  simbolo_moneda: '$',
+  logo_url: null,
+  activo: true
+};
+
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [profile, setProfile] = useState(null);
+  const [negocio, setNegocio] = useState(DEFAULT_NEGOCIO);
   const [loading, setLoading] = useState(true);
+
+  // Cargar datos del Negocio (Tenant) desde Supabase
+  const fetchNegocio = async (negocioId) => {
+    if (!isSupabaseConfigured || !supabase || !negocioId) {
+      setNegocio(DEFAULT_NEGOCIO);
+      return DEFAULT_NEGOCIO;
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('negocios')
+        .select('*')
+        .eq('id', negocioId)
+        .single();
+
+      if (!error && data) {
+        setNegocio(data);
+        return data;
+      }
+    } catch (err) {
+      console.warn('⚠️ No se pudo obtener el negocio de Supabase, usando configuración predeterminada:', err);
+    }
+    setNegocio(DEFAULT_NEGOCIO);
+    return DEFAULT_NEGOCIO;
+  };
 
   // Cargar perfil desde la tabla 'perfiles' de Supabase
   const fetchProfile = async (userId, userEmail) => {
@@ -20,6 +57,9 @@ export function AuthProvider({ children }) {
 
         if (!error && data) {
           setProfile(data);
+          if (data.negocio_id) {
+            await fetchNegocio(data.negocio_id);
+          }
           return data;
         }
       } catch (err) {
@@ -31,11 +71,13 @@ export function AuthProvider({ children }) {
     const defaultRole = userEmail?.includes('admin') ? 'admin' : 'empleado';
     const mockProfile = {
       id: userId,
+      negocio_id: DEFAULT_NEGOCIO.id,
       email: userEmail,
       nombre: userEmail?.split('@')[0] || 'Usuario',
       rol: defaultRole
     };
     setProfile(mockProfile);
+    setNegocio(DEFAULT_NEGOCIO);
     return mockProfile;
   };
 
@@ -62,6 +104,7 @@ export function AuthProvider({ children }) {
       } else {
         setUser(null);
         setProfile(null);
+        setNegocio(DEFAULT_NEGOCIO);
       }
       setLoading(false);
     });
@@ -94,9 +137,16 @@ export function AuthProvider({ children }) {
     // Login Simulado en modo local/pruebas
     const role = email.includes('admin') ? 'admin' : 'empleado';
     const mockUser = { id: 'usr-mock-' + Date.now(), email };
-    const mockProf = { id: mockUser.id, email, nombre: email.split('@')[0], rol: role };
+    const mockProf = { 
+      id: mockUser.id, 
+      negocio_id: DEFAULT_NEGOCIO.id,
+      email, 
+      nombre: email.split('@')[0], 
+      rol: role 
+    };
     setUser(mockUser);
     setProfile(mockProf);
+    setNegocio(DEFAULT_NEGOCIO);
     setLoading(false);
     return { user: mockUser, profile: mockProf };
   };
@@ -108,6 +158,14 @@ export function AuthProvider({ children }) {
     }
     setUser(null);
     setProfile(null);
+    setNegocio(DEFAULT_NEGOCIO);
+  };
+
+  // Helper de Formateo de Moneda Dinámico según el Tenant
+  const formatCurrency = (val) => {
+    const num = Number(val) || 0;
+    const symbol = negocio?.simbolo_moneda || '$';
+    return `${symbol} ${num.toLocaleString('es-CO')}`;
   };
 
   return (
@@ -115,10 +173,12 @@ export function AuthProvider({ children }) {
       value={{
         user,
         profile,
+        negocio,
         role: profile?.rol || null,
         loading,
         login,
         logout,
+        formatCurrency,
         isSupabaseConfigured
       }}
     >
