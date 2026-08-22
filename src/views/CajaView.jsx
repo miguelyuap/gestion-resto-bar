@@ -91,33 +91,33 @@ export function CajaView() {
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 pb-20">
       
       {/* HEADER DASHBOARD DE CAJA Y COCINA */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 bg-slate-900 border border-slate-800 p-6 rounded-2xl">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 rounded-2xl shadow-sm transition-colors duration-200">
         <div className="flex items-center gap-4">
           <div className="w-12 h-12 rounded-xl bg-emerald-500 text-slate-950 flex items-center justify-center font-black text-xl shrink-0 shadow-sm">
             🖥️
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-xl sm:text-2xl font-extrabold text-white">Dashboard de Caja & Cocina</h1>
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              <h1 className="text-xl sm:text-2xl font-extrabold text-slate-900 dark:text-white">Dashboard de Caja & Cocina</h1>
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
             </div>
-            <p className="text-xs text-slate-400 mt-0.5">
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
               {negocio?.nombre || 'GST Resto Bar'} &bull; Control en Tiempo Real vía Supabase Realtime
             </p>
           </div>
         </div>
 
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 bg-slate-950 border border-slate-800 px-3 py-1.5 rounded-xl text-xs">
+          <div className="flex items-center gap-2 bg-slate-100 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 px-3 py-1.5 rounded-xl text-xs">
             <Filter className="w-3.5 h-3.5 text-slate-400" />
             <select
               value={filtroMesa}
               onChange={(e) => setFiltroMesa(e.target.value)}
-              className="bg-transparent text-white font-bold outline-none text-xs"
+              className="bg-transparent text-slate-900 dark:text-white font-bold outline-none text-xs"
             >
-              <option value="" className="bg-slate-900 text-white">Todas las Mesas</option>
+              <option value="" className="bg-white dark:bg-slate-900 text-slate-900 dark:text-white">Todas las Mesas</option>
               {Array.from({ length: 10 }, (_, i) => i + 1).map(n => (
-                <option key={n} value={n} className="bg-slate-900 text-white">Mesa #{n}</option>
+                <option key={n} value={n} className="bg-white dark:bg-slate-900 text-slate-900 dark:text-white">Mesa #{n}</option>
               ))}
             </select>
           </div>
@@ -126,18 +126,18 @@ export function CajaView() {
             onClick={handleToggleMute}
             className={`p-2.5 rounded-xl border text-xs font-bold transition-all flex items-center gap-2 ${
               isMuted
-                ? 'bg-rose-950/40 text-rose-400 border-rose-900/60'
-                : 'bg-slate-800 text-slate-200 border-slate-700 hover:bg-slate-700'
+                ? 'bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 border-rose-200 dark:border-rose-900/60'
+                : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700 hover:bg-slate-200'
             }`}
             title="Activar/Desactivar Alerta Sonora"
           >
-            {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4 text-emerald-400 animate-bounce" />}
+            {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4 text-emerald-500 dark:text-emerald-400 animate-bounce" />}
             <span className="hidden sm:inline">{isMuted ? 'Mute' : 'Sonido'}</span>
           </button>
 
           <button
             onClick={loadPedidos}
-            className="p-2.5 rounded-xl bg-slate-800 text-slate-300 hover:text-white border border-slate-700 transition-colors"
+            className="p-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white border border-slate-200 dark:border-slate-700 transition-colors"
             title="Recargar"
           >
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
@@ -148,14 +148,14 @@ export function CajaView() {
       {/* TARJETAS KANBAN DE ESTADOS (4 COLUMNAS) */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         
-        {/* COLUMNA 1: PENDIENTES (NUEVOS ENTRANTES) */}
+        {/* COLUMNA 1: PENDIENTES */}
         <div className="space-y-4">
           <div className="flex items-center justify-between bg-amber-500/10 border border-amber-500/20 px-4 py-3 rounded-xl">
             <div className="flex items-center gap-2">
-              <Clock className="w-4 h-4 text-amber-400" />
-              <h2 className="font-extrabold text-sm text-amber-300">Pendientes</h2>
+              <Clock className="w-4 h-4 text-amber-500 dark:text-amber-400" />
+              <h2 className="font-extrabold text-sm text-amber-700 dark:text-amber-300">Pendientes</h2>
             </div>
-            <span className="font-black text-xs px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">
+            <span className="font-black text-xs px-2 py-0.5 rounded bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-500/30">
               {pendientes.length}
             </span>
           </div>
@@ -179,10 +179,10 @@ export function CajaView() {
         <div className="space-y-4">
           <div className="flex items-center justify-between bg-blue-500/10 border border-blue-500/20 px-4 py-3 rounded-xl">
             <div className="flex items-center gap-2">
-              <ChefHat className="w-4 h-4 text-blue-400" />
-              <h2 className="font-extrabold text-sm text-blue-300">En Preparación</h2>
+              <ChefHat className="w-4 h-4 text-blue-500 dark:text-blue-400" />
+              <h2 className="font-extrabold text-sm text-blue-700 dark:text-blue-300">En Preparación</h2>
             </div>
-            <span className="font-black text-xs px-2 py-0.5 rounded bg-blue-500/20 text-blue-300 border border-blue-500/30">
+            <span className="font-black text-xs px-2 py-0.5 rounded bg-blue-500/20 text-blue-700 dark:text-blue-300 border border-blue-500/30">
               {enPreparacion.length}
             </span>
           </div>
@@ -202,14 +202,14 @@ export function CajaView() {
           </div>
         </div>
 
-        {/* COLUMNA 3: ENTREGADOS (LISTOS PARA FACTURAR) */}
+        {/* COLUMNA 3: ENTREGADOS */}
         <div className="space-y-4">
           <div className="flex items-center justify-between bg-purple-500/10 border border-purple-500/20 px-4 py-3 rounded-xl">
             <div className="flex items-center gap-2">
-              <CheckCircle2 className="w-4 h-4 text-purple-400" />
-              <h2 className="font-extrabold text-sm text-purple-300">Entregados</h2>
+              <CheckCircle2 className="w-4 h-4 text-purple-500 dark:text-purple-400" />
+              <h2 className="font-extrabold text-sm text-purple-700 dark:text-purple-300">Entregados</h2>
             </div>
-            <span className="font-black text-xs px-2 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30">
+            <span className="font-black text-xs px-2 py-0.5 rounded bg-purple-500/20 text-purple-700 dark:text-purple-300 border border-purple-500/30">
               {entregados.length}
             </span>
           </div>
@@ -229,27 +229,38 @@ export function CajaView() {
           </div>
         </div>
 
-        {/* COLUMNA 4: FACTURADOS (HISTORIAL) */}
+        {/* COLUMNA 4: FACTURADOS */}
         <div className="space-y-4">
-          <div className="flex items-center justify-between bg-slate-900 border border-slate-800 px-4 py-3 rounded-xl">
+          <div className="flex items-center justify-between bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 px-4 py-3 rounded-xl">
             <div className="flex items-center gap-2">
               <Receipt className="w-4 h-4 text-slate-400" />
-              <h2 className="font-extrabold text-sm text-slate-300">Facturados</h2>
+              <h2 className="font-extrabold text-sm text-slate-700 dark:text-slate-300">Facturados</h2>
             </div>
-            <span className="font-black text-xs px-2 py-0.5 rounded bg-slate-800 text-slate-400">
+            <span className="font-black text-xs px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
               {facturados.length}
             </span>
           </div>
 
           <div className="space-y-3 max-h-[600px] overflow-y-auto pr-1">
             {facturados.map(pedido => (
-              <div key={pedido.id} className="bg-slate-950 border border-slate-800 p-4 rounded-xl opacity-75">
+              <div 
+                key={pedido.id} 
+                onClick={() => setOrderToBill(pedido)}
+                className="bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 hover:border-emerald-500/50 p-4 rounded-xl shadow-sm cursor-pointer transition-all group"
+              >
                 <div className="flex justify-between items-center text-xs mb-1">
-                  <span className="font-black text-slate-300">Mesa #{pedido.mesas?.numero_mesa || pedido.numero_mesa || '?'}</span>
-                  <span className="text-[10px] uppercase font-bold text-emerald-400">{pedido.metodo_pago || 'Pago'}</span>
+                  <span className="font-black text-slate-800 dark:text-slate-300 group-hover:text-emerald-500 transition-colors">
+                    Mesa #{pedido.mesas?.numero_mesa || pedido.numero_mesa || '?'}
+                  </span>
+                  <span className="text-[10px] uppercase font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
+                    💳 {pedido.metodo_pago || 'Pago'}
+                  </span>
                 </div>
-                <div className="text-right text-sm font-black text-slate-200">
-                  {formatCurrency(pedido.total)}
+                <div className="flex items-center justify-between mt-2 pt-2 border-t border-slate-100 dark:border-slate-900 text-xs">
+                  <span className="text-[10px] text-slate-400 font-mono">Ver Factura 🔍</span>
+                  <span className="text-sm font-black text-slate-900 dark:text-slate-200">
+                    {formatCurrency(pedido.total)}
+                  </span>
                 </div>
               </div>
             ))}
@@ -280,39 +291,39 @@ function PedidoCard({ pedido, formatCurrency, onNextState, nextActionLabel, next
   const detalles = pedido.detalle_pedido || pedido.detalles || [];
 
   return (
-    <div className="bg-slate-900 border border-slate-800 hover:border-slate-700 p-4 rounded-xl space-y-3 transition-all">
-      <div className="flex items-center justify-between border-b border-slate-800/80 pb-2">
-        <span className="font-black text-base text-white">Mesa #{mesaNum}</span>
-        <span className="text-[10px] text-slate-500 font-medium">
+    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 p-4 rounded-xl space-y-3 transition-all shadow-sm">
+      <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800/80 pb-2">
+        <span className="font-black text-base text-slate-900 dark:text-white">Mesa #{mesaNum}</span>
+        <span className="text-[10px] text-slate-400 dark:text-slate-500 font-medium">
           {new Date(pedido.created_at || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
         </span>
       </div>
 
       {detalles.length > 0 ? (
-        <div className="space-y-1.5 text-xs text-slate-300">
+        <div className="space-y-1.5 text-xs text-slate-700 dark:text-slate-300">
           {detalles.map((d, idx) => (
             <div key={idx} className="flex justify-between items-center">
               <span className="truncate pr-2 font-medium">
                 {d.cantidad}x {d.productos?.nombre || d.producto?.nombre || 'Bebida'} ({d.tamano})
               </span>
-              <span className="font-bold text-slate-400">{formatCurrency(d.precio_unitario * d.cantidad)}</span>
+              <span className="font-bold text-slate-500 dark:text-slate-400">{formatCurrency(d.precio_unitario * d.cantidad)}</span>
             </div>
           ))}
         </div>
       ) : (
-        <p className="text-xs text-slate-500 italic">Sin detalle especificado</p>
+        <p className="text-xs text-slate-400 italic">Sin detalle especificado</p>
       )}
 
       {pedido.notas && (
-        <p className="text-[11px] bg-slate-950 border border-slate-800 p-2 rounded-lg text-amber-300/90 font-mono line-clamp-2">
+        <p className="text-[11px] bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 p-2 rounded-lg text-amber-600 dark:text-amber-300/90 font-mono line-clamp-2">
           {pedido.notas}
         </p>
       )}
 
-      <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between">
+      <div className="pt-2 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between">
         <div className="text-xs">
-          <span className="text-[10px] text-slate-500 block">Total</span>
-          <span className="font-black text-emerald-400 text-sm">{formatCurrency(pedido.total)}</span>
+          <span className="text-[10px] text-slate-400 dark:text-slate-500 block">Total</span>
+          <span className="font-black text-emerald-600 dark:text-emerald-400 text-sm">{formatCurrency(pedido.total)}</span>
         </div>
 
         <button

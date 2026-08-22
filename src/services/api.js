@@ -3,7 +3,7 @@ import { supabase, isSupabaseConfigured } from '../lib/supabase';
 const DEFAULT_TENANT_ID = '00000000-0000-0000-0000-000000000001';
 
 // MENÚ COMPLETO Y EXACTO DE "GST RESTO BAR"
-const MOCK_PRODUCTS = [
+let mockProducts = [
   {
     id: 'prod-1',
     negocio_id: DEFAULT_TENANT_ID,
@@ -123,7 +123,7 @@ const MOCK_PRODUCTS = [
   }
 ];
 
-const MOCK_MESAS = Array.from({ length: 10 }, (_, i) => ({
+let mockMesas = Array.from({ length: 10 }, (_, i) => ({
   id: `mesa-${i + 1}`,
   negocio_id: DEFAULT_TENANT_ID,
   numero_mesa: i + 1,
@@ -170,7 +170,7 @@ export const apiService = {
         console.warn('Usando productos locales por error en Supabase:', err);
       }
     }
-    return MOCK_PRODUCTS;
+    return mockProducts.filter(p => p.activo);
   },
 
   // Helper para validar o crear UUID de producto en el tenant
@@ -280,7 +280,7 @@ export const apiService = {
       }
     }
 
-    return MOCK_MESAS.map(m => {
+    return mockMesas.map(m => {
       const pActivo = mockOrders.find(p => p.mesa_id === m.id && p.estado !== 'facturado');
       return {
         ...m,
@@ -288,6 +288,140 @@ export const apiService = {
         pedidoActivo: pActivo || null
       };
     });
+  },
+
+  // 2.1 CREAR PRODUCTO (ADMIN)
+  async crearProducto(prodData, negocioId = null) {
+    const targetNegocioId = negocioId || DEFAULT_TENANT_ID;
+    const nuevo = {
+      negocio_id: targetNegocioId,
+      nombre: prodData.nombre.trim(),
+      categoria: prodData.categoria.trim(),
+      ingredientes: prodData.ingredientes || '',
+      precio_8oz: Number(prodData.precio_8oz) || 0,
+      precio_12oz: Number(prodData.precio_12oz) || 0,
+      precio_24oz: Number(prodData.precio_24oz) || 0,
+      precio_100oz: Number(prodData.precio_100oz) || 0,
+      activo: true,
+      imagen_url: prodData.imagen_url || 'https://images.unsplash.com/photo-1536935338788-846bb9981813?auto=format&fit=crop&w=400&q=80'
+    };
+
+    if (isSupabaseConfigured && supabase) {
+      try {
+        const { data, error } = await supabase
+          .from('productos')
+          .insert([nuevo])
+          .select()
+          .single();
+
+        if (!error && data) {
+          return data;
+        }
+        if (error) console.error('Error insertando producto en Supabase:', error);
+      } catch (err) {
+        console.warn('Fallback a modo mock para crear producto:', err);
+      }
+    }
+
+    const mockItem = {
+      ...nuevo,
+      id: `prod-${Date.now()}`
+    };
+    mockProducts.unshift(mockItem);
+    return mockItem;
+  },
+
+  // 2.2 ELIMINAR PRODUCTO (ADMIN)
+  async eliminarProducto(productoId, negocioId = null) {
+    if (isSupabaseConfigured && supabase && isUuidFormat(productoId)) {
+      try {
+        const { error } = await supabase
+          .from('productos')
+          .delete()
+          .eq('id', productoId);
+
+        if (!error) return true;
+
+        // Si falla la eliminación directa por FK o políticas, desactivamos el producto
+        await supabase
+          .from('productos')
+          .update({ activo: false })
+          .eq('id', productoId);
+        return true;
+      } catch (err) {
+        console.warn('Fallback a modo mock para eliminar producto:', err);
+      }
+    }
+
+    mockProducts = mockProducts.filter(p => p.id !== productoId);
+    return true;
+  },
+
+  // 2.3 CREAR MESA (ADMIN)
+  async crearMesa({ numero_mesa = null, negocioId = null }) {
+    const targetNegocioId = negocioId || DEFAULT_TENANT_ID;
+
+    // Calcular numero_mesa si no viene dado
+    let targetNum = parseInt(numero_mesa, 10);
+    if (!targetNum || isNaN(targetNum)) {
+      const currentMesas = await this.getMesas(targetNegocioId);
+      const maxNum = currentMesas.reduce((max, m) => Math.max(max, m.numero_mesa || 0), 0);
+      targetNum = maxNum + 1;
+    }
+
+    const nuevaMesa = {
+      negocio_id: targetNegocioId,
+      numero_mesa: targetNum,
+      estado: 'disponible',
+      qr_code_url: `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(`http://localhost:5173/?mesa=${targetNum}`)}`
+    };
+
+    if (isSupabaseConfigured && supabase) {
+      try {
+        const { data, error } = await supabase
+          .from('mesas')
+          .insert([{ negocio_id: targetNegocioId, numero_mesa: targetNum, estado: 'disponible' }])
+          .select()
+          .single();
+
+        if (!error && data) {
+          return {
+            ...data,
+            qr_code_url: nuevaMesa.qr_code_url
+          };
+        }
+        if (error) console.error('Error creando mesa en Supabase:', error);
+      } catch (err) {
+        console.warn('Fallback a modo mock para crear mesa:', err);
+      }
+    }
+
+    const mockItem = {
+      ...nuevaMesa,
+      id: `mesa-${Date.now()}`
+    };
+    mockMesas.push(mockItem);
+    return mockItem;
+  },
+
+  // 2.4 ELIMINAR MESA (ADMIN)
+  async eliminarMesa(mesaId, negocioId = null) {
+    if (isSupabaseConfigured && supabase && isUuidFormat(mesaId)) {
+      try {
+        const { error } = await supabase
+          .from('mesas')
+          .delete()
+          .eq('id', mesaId);
+
+        if (!error) return true;
+        console.error('Error eliminando mesa en Supabase:', error);
+      } catch (err) {
+        console.warn('Fallback a modo mock para eliminar mesa:', err);
+      }
+    }
+
+    mockMesas = mockMesas.filter(m => m.id !== mesaId && m.numero_mesa !== mesaId);
+    return true;
   },
 
   // 3. CREAR PEDIDO NUEVO (MULTI-TENANT)

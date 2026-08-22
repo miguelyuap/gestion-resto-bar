@@ -185,48 +185,51 @@ export function MeseroView() {
     return matchCat && matchSearch;
   });
 
+  const categoriasExistentes = Array.from(new Set(productos.map(p => p.categoria).filter(Boolean)));
   const categorias = [
     { id: 'todos', label: 'Todos', icon: LayoutGrid },
-    { id: 'con_licor', label: 'Con Licor', icon: Flame },
-    { id: 'sin_licor', label: 'Sin Licor', icon: GlassWater },
-    { id: 'cremoso', label: 'Cremosos', icon: Layers }
+    ...categoriasExistentes.map(cat => ({
+      id: cat,
+      label: cat.replace('_', ' '),
+      icon: cat.includes('licor') ? Flame : cat.includes('crem') ? Layers : GlassWater
+    }))
   ];
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 pb-28">
       
       {/* HEADER MÓDULO DE MESEROS */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 bg-slate-900 border border-slate-800 p-5 sm:p-6 rounded-2xl">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 sm:p-6 rounded-2xl shadow-sm transition-colors duration-200">
         <div className="flex items-center gap-4">
           <div className="w-12 h-12 rounded-xl bg-emerald-500 text-slate-950 flex items-center justify-center font-black text-xl shrink-0 shadow-sm">
             🧑‍🍳
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-xl sm:text-2xl font-extrabold text-white">Toma de Pedidos</h1>
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              <h1 className="text-xl sm:text-2xl font-extrabold text-slate-900 dark:text-white">Toma de Pedidos</h1>
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
             </div>
-            <p className="text-xs text-slate-400 mt-0.5">
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
               {negocio?.nombre || 'GST Resto Bar'} &bull; Comandas en vivo para Cocina y Caja
             </p>
           </div>
         </div>
 
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 bg-slate-950 px-3 py-2 rounded-xl border border-slate-800 text-xs">
-            <User className="w-4 h-4 text-emerald-400" />
+          <div className="flex items-center gap-2 bg-slate-100 dark:bg-slate-950 px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-800 text-xs">
+            <User className="w-4 h-4 text-emerald-500 dark:text-emerald-400" />
             <input
               type="text"
               value={meseroNombre}
               onChange={(e) => setMeseroNombre(e.target.value)}
-              className="bg-transparent text-white font-bold outline-none w-32 text-xs"
+              className="bg-transparent text-slate-900 dark:text-white font-bold outline-none w-32 text-xs"
               placeholder="Nombre Mesero"
             />
           </div>
 
           <button
             onClick={loadData}
-            className="p-2.5 rounded-xl bg-slate-800 text-slate-300 hover:text-white border border-slate-700 transition-colors"
+            className="p-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white border border-slate-200 dark:border-slate-700 transition-colors"
             title="Recargar mesas y menú"
           >
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
@@ -234,17 +237,17 @@ export function MeseroView() {
         </div>
       </div>
 
-      {/* SELECTOR DESLIZABLE DE MESAS (1 a 10) */}
+      {/* SELECTOR DESLIZABLE DE MESAS (Dinámicas) */}
       <div className="mb-6">
         <div className="flex items-center justify-between mb-3">
-          <h2 className="text-xs font-black text-slate-400 uppercase tracking-wider">
-            1. Selecciona la Mesa para la Comanda
+          <h2 className="text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+            1. Selecciona la Mesa para la Comanda ({mesas.length} disponibles)
           </h2>
           {mesaActualObj && (
             <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full border ${
               mesaActualObj.estado === 'ocupada' 
-                ? 'bg-rose-500/10 text-rose-400 border-rose-500/20' 
-                : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                ? 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20' 
+                : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20'
             }`}>
               Mesa #{selectedMesa}: {mesaActualObj.estado === 'ocupada' ? 'Ocupada (Adicionar)' : 'Disponible (Nueva)'}
             </span>
@@ -252,21 +255,21 @@ export function MeseroView() {
         </div>
 
         <div className="grid grid-cols-5 sm:grid-cols-10 gap-2">
-          {Array.from({ length: 10 }, (_, i) => i + 1).map(num => {
+          {(mesas.length > 0 ? mesas : Array.from({ length: 10 }, (_, i) => ({ id: i + 1, numero_mesa: i + 1 }))).map(mesa => {
+            const num = mesa.numero_mesa;
             const isSelected = parseInt(selectedMesa) === num;
-            const mesaObj = mesas.find(m => m.numero_mesa === num);
-            const isOcupada = mesaObj?.estado === 'ocupada';
+            const isOcupada = mesa?.estado === 'ocupada';
 
             return (
               <button
-                key={num}
+                key={mesa.id || num}
                 onClick={() => handleSelectMesa(num)}
                 className={`py-3 rounded-xl font-black text-sm transition-all flex flex-col items-center justify-center border relative ${
                   isSelected
                     ? 'bg-emerald-500 text-slate-950 border-emerald-400 shadow-md shadow-emerald-500/20 scale-[1.02]'
                     : isOcupada
-                    ? 'bg-rose-950/40 text-rose-300 border-rose-900/60 hover:bg-rose-900/40'
-                    : 'bg-slate-900 text-slate-300 border-slate-800 hover:bg-slate-800 hover:text-white'
+                    ? 'bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-900/60 hover:bg-rose-100'
+                    : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800'
                 }`}
               >
                 <span>Mesa {num}</span>
@@ -279,10 +282,10 @@ export function MeseroView() {
         </div>
       </div>
 
-      {/* CONTENIDO PRINCIPAL: CATÁLOGO DE PRODUCTOS + RESUMEN DESK */}
+      {/* CONTENIDO PRINCIPAL: CATÁLOGO DE PRODUCTOS + RESUMEN DESKTOP */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
         
-        {/* COLUMNA CATÁLOGO (2 COLS EN LG) */}
+        {/* COLUMNA CATÁLOGO */}
         <div className="lg:col-span-2 space-y-5">
           
           {/* BUSCADOR Y SELECCIÓN DESLIZABLE DE CATEGORÍAS EN MÓVIL */}
@@ -294,11 +297,11 @@ export function MeseroView() {
                 placeholder="Buscar bebida por nombre o ingrediente..."
                 value={busqueda}
                 onChange={(e) => setBusqueda(e.target.value)}
-                className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-10 pr-4 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500/50"
+                className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl pl-10 pr-4 py-2.5 text-sm text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-emerald-500/50 shadow-sm"
               />
             </div>
 
-            {/* CATEGORÍAS DESLIZABLES HORIZONTALMENTE (NO SCROLLBAR) */}
+            {/* CATEGORÍAS DESLIZABLES HORIZONTALMENTE */}
             <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar scroll-smooth">
               {categorias.map(cat => {
                 const Icon = cat.icon;
@@ -309,8 +312,8 @@ export function MeseroView() {
                     onClick={() => setCategoriaSel(cat.id)}
                     className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all border shrink-0 ${
                       active
-                        ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
-                        : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-slate-200'
+                        ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30'
+                        : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-800 hover:text-slate-900 dark:hover:text-slate-200'
                     }`}
                   >
                     <Icon className="w-3.5 h-3.5" />
@@ -324,11 +327,11 @@ export function MeseroView() {
           {/* GRID DE PRODUCTOS */}
           {loading ? (
             <div className="py-16 text-center text-slate-500">
-              <RefreshCw className="w-6 h-6 animate-spin mx-auto mb-2 text-emerald-400" />
+              <RefreshCw className="w-6 h-6 animate-spin mx-auto mb-2 text-emerald-500" />
               <p className="text-xs">Cargando productos...</p>
             </div>
           ) : productosFiltrados.length === 0 ? (
-            <div className="py-12 bg-slate-900/50 border border-slate-800 rounded-2xl text-center text-slate-400 text-xs">
+            <div className="py-12 bg-white dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 rounded-2xl text-center text-slate-500 dark:text-slate-400 text-xs">
               No se encontraron productos en esta categoría.
             </div>
           ) : (
@@ -336,33 +339,33 @@ export function MeseroView() {
               {productosFiltrados.map(prod => (
                 <div
                   key={prod.id}
-                  className="bg-slate-900 border border-slate-800 hover:border-slate-700 p-4 rounded-2xl flex flex-col justify-between transition-all group"
+                  className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 p-4 rounded-2xl flex flex-col justify-between transition-all group shadow-sm"
                 >
                   <div className="flex gap-3.5 mb-3">
                     <img
                       src={prod.imagen_url || 'https://images.unsplash.com/photo-1536935338788-846bb9981813?auto=format&fit=crop&w=400&q=80'}
                       alt={prod.nombre}
-                      className="w-16 h-16 rounded-xl object-cover shrink-0 border border-slate-800"
+                      className="w-16 h-16 rounded-xl object-cover shrink-0 border border-slate-200 dark:border-slate-800"
                     />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between gap-1">
-                        <h3 className="font-extrabold text-sm text-white group-hover:text-emerald-400 transition-colors truncate">
+                        <h3 className="font-extrabold text-sm text-slate-900 dark:text-white group-hover:text-emerald-500 dark:group-hover:text-emerald-400 transition-colors truncate">
                           {prod.nombre}
                         </h3>
-                        <span className="text-[10px] uppercase font-bold text-slate-400 bg-slate-800 px-2 py-0.5 rounded">
+                        <span className="text-[10px] uppercase font-bold text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded">
                           {prod.categoria.replace('_', ' ')}
                         </span>
                       </div>
-                      <p className="text-xs text-slate-400 mt-1 line-clamp-2">
+                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 line-clamp-2">
                         {prod.ingredientes || 'Sin ingredientes especificados'}
                       </p>
                     </div>
                   </div>
 
-                  <div className="flex items-center justify-between pt-3 border-t border-slate-800/60 mt-auto">
+                  <div className="flex items-center justify-between pt-3 border-t border-slate-100 dark:border-slate-800/60 mt-auto">
                     <div className="text-xs">
-                      <span className="text-slate-400 block text-[10px]">Desde (12oz)</span>
-                      <span className="font-black text-emerald-400 text-sm">{formatCurrency(prod.precio_12oz)}</span>
+                      <span className="text-slate-400 dark:text-slate-500 block text-[10px]">Desde (12oz)</span>
+                      <span className="font-black text-emerald-600 dark:text-emerald-400 text-sm">{formatCurrency(prod.precio_12oz)}</span>
                     </div>
 
                     <button
@@ -381,50 +384,50 @@ export function MeseroView() {
         </div>
 
         {/* COLUMNA DERECHA: RESUMEN DE COMANDA (DESKTOP) */}
-        <div className="hidden lg:block bg-slate-900 border border-slate-800 rounded-2xl p-5 sticky top-20">
-          <div className="flex items-center justify-between pb-4 border-b border-slate-800 mb-4">
+        <div className="hidden lg:block bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 sticky top-20 shadow-sm">
+          <div className="flex items-center justify-between pb-4 border-b border-slate-100 dark:border-slate-800 mb-4">
             <div className="flex items-center gap-2">
-              <ShoppingBag className="w-5 h-5 text-emerald-400" />
-              <h2 className="font-extrabold text-base text-white">Comanda Mesa #{selectedMesa}</h2>
+              <ShoppingBag className="w-5 h-5 text-emerald-500 dark:text-emerald-400" />
+              <h2 className="font-extrabold text-base text-slate-900 dark:text-white">Comanda Mesa #{selectedMesa}</h2>
             </div>
-            <span className="text-xs font-bold px-2 py-0.5 rounded bg-slate-800 text-slate-300">
+            <span className="text-xs font-bold px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
               {cartItemCount} ítems
             </span>
           </div>
 
           {cart.length === 0 ? (
-            <div className="py-12 text-center text-slate-500">
+            <div className="py-12 text-center text-slate-400 dark:text-slate-500">
               <p className="text-xs">El carrito está vacío.</p>
-              <p className="text-[11px] text-slate-600 mt-1">Selecciona productos para armar el pedido.</p>
+              <p className="text-[11px] text-slate-400 dark:text-slate-600 mt-1">Selecciona productos para armar el pedido.</p>
             </div>
           ) : (
             <div className="space-y-4">
               <div className="max-h-72 overflow-y-auto space-y-3 pr-1">
                 {cart.map((item, idx) => (
-                  <div key={idx} className="flex items-center justify-between bg-slate-950 p-3 rounded-xl border border-slate-800 text-xs">
+                  <div key={idx} className="flex items-center justify-between bg-slate-50 dark:bg-slate-950 p-3 rounded-xl border border-slate-200 dark:border-slate-800 text-xs">
                     <div className="flex-1 min-w-0 pr-2">
-                      <p className="font-bold text-white truncate">{item.producto.nombre}</p>
-                      <span className="text-[10px] font-bold text-emerald-400">{item.tamano}</span>
-                      <p className="text-[11px] text-slate-400">{formatCurrency(item.precio_unitario)}</p>
+                      <p className="font-bold text-slate-900 dark:text-white truncate">{item.producto.nombre}</p>
+                      <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400">{item.tamano}</span>
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400">{formatCurrency(item.precio_unitario)}</p>
                     </div>
 
                     <div className="flex items-center gap-2">
                       <button
                         onClick={() => updateQuantity(item.producto.id, item.tamano, -1)}
-                        className="p-1 rounded bg-slate-800 text-slate-300 hover:text-white"
+                        className="p-1 rounded bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-300"
                       >
                         <Minus className="w-3 h-3" />
                       </button>
-                      <span className="font-black text-white w-4 text-center">{item.cantidad}</span>
+                      <span className="font-black text-slate-900 dark:text-white w-4 text-center">{item.cantidad}</span>
                       <button
                         onClick={() => updateQuantity(item.producto.id, item.tamano, 1)}
-                        className="p-1 rounded bg-slate-800 text-slate-300 hover:text-white"
+                        className="p-1 rounded bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-300"
                       >
                         <Plus className="w-3 h-3" />
                       </button>
                       <button
                         onClick={() => removeFromCart(item.producto.id, item.tamano)}
-                        className="p-1 rounded text-rose-400 hover:bg-rose-950/50 ml-1"
+                        className="p-1 rounded text-rose-500 hover:bg-rose-100 dark:hover:bg-rose-950/50 ml-1"
                       >
                         <Trash2 className="w-3 h-3" />
                       </button>
@@ -434,19 +437,19 @@ export function MeseroView() {
               </div>
 
               <div>
-                <label className="block text-[11px] font-bold text-slate-400 mb-1">Notas especiales:</label>
+                <label className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 mb-1">Notas especiales:</label>
                 <textarea
                   value={notas}
                   onChange={(e) => setNotas(e.target.value)}
                   placeholder="Ej. Sin hielo, servilletas extra..."
                   rows={2}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2 text-xs text-white placeholder-slate-600 focus:outline-none focus:border-emerald-500/50"
+                  className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-2 text-xs text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-600 focus:outline-none focus:border-emerald-500/50"
                 />
               </div>
 
-              <div className="pt-3 border-t border-slate-800 flex items-center justify-between">
-                <span className="text-xs text-slate-400 font-medium">Total Estimado</span>
-                <span className="text-lg font-black text-emerald-400">{formatCurrency(cartTotal)}</span>
+              <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">Total Estimado</span>
+                <span className="text-lg font-black text-emerald-600 dark:text-emerald-400">{formatCurrency(cartTotal)}</span>
               </div>
 
               <button
@@ -469,7 +472,7 @@ export function MeseroView() {
 
       </div>
 
-      {/* BOTÓN FLOTANTE MÓVIL (FAB) PARA VER RESUMEN DE PEDIDO */}
+      {/* BOTÓN FLOTANTE MÓVIL (FAB) */}
       <div className="fixed bottom-6 right-6 lg:hidden z-40">
         <button
           onClick={() => setIsCartOpen(true)}
@@ -487,45 +490,45 @@ export function MeseroView() {
 
       {/* MODAL MÓVIL DE RESUMEN DE COMANDA */}
       {isCartOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4">
-          <div className="bg-slate-900 border border-slate-800 w-full sm:max-w-lg rounded-t-3xl sm:rounded-2xl p-6 space-y-4 max-h-[85vh] overflow-y-auto">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+        <div className="fixed inset-0 z-50 bg-slate-950/70 dark:bg-slate-950/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 w-full sm:max-w-lg rounded-t-3xl sm:rounded-2xl p-6 space-y-4 max-h-[85vh] overflow-y-auto">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
               <div className="flex items-center gap-2">
-                <ShoppingBag className="w-5 h-5 text-emerald-400" />
-                <h3 className="font-extrabold text-base text-white">Comanda Mesa #{selectedMesa}</h3>
+                <ShoppingBag className="w-5 h-5 text-emerald-500 dark:text-emerald-400" />
+                <h3 className="font-extrabold text-base text-slate-900 dark:text-white">Comanda Mesa #{selectedMesa}</h3>
               </div>
               <button
                 onClick={() => setIsCartOpen(false)}
-                className="p-1 rounded-lg text-slate-400 hover:text-white"
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-white"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             {cart.length === 0 ? (
-              <div className="py-8 text-center text-slate-500 text-xs">
+              <div className="py-8 text-center text-slate-400 text-xs">
                 No hay productos agregados en esta comanda.
               </div>
             ) : (
               <div className="space-y-3">
                 {cart.map((item, idx) => (
-                  <div key={idx} className="flex items-center justify-between bg-slate-950 p-3 rounded-xl border border-slate-800 text-xs">
+                  <div key={idx} className="flex items-center justify-between bg-slate-50 dark:bg-slate-950 p-3 rounded-xl border border-slate-200 dark:border-slate-800 text-xs">
                     <div>
-                      <p className="font-bold text-white">{item.producto.nombre}</p>
-                      <span className="text-[10px] font-bold text-emerald-400">{item.tamano}</span>
+                      <p className="font-bold text-slate-900 dark:text-white">{item.producto.nombre}</p>
+                      <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400">{item.tamano}</span>
                     </div>
 
                     <div className="flex items-center gap-2">
                       <button
                         onClick={() => updateQuantity(item.producto.id, item.tamano, -1)}
-                        className="p-1.5 rounded bg-slate-800 text-slate-300"
+                        className="p-1.5 rounded bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300"
                       >
                         <Minus className="w-3.5 h-3.5" />
                       </button>
-                      <span className="font-black text-white text-sm w-4 text-center">{item.cantidad}</span>
+                      <span className="font-black text-slate-900 dark:text-white text-sm w-4 text-center">{item.cantidad}</span>
                       <button
                         onClick={() => updateQuantity(item.producto.id, item.tamano, 1)}
-                        className="p-1.5 rounded bg-slate-800 text-slate-300"
+                        className="p-1.5 rounded bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300"
                       >
                         <Plus className="w-3.5 h-3.5" />
                       </button>
@@ -534,19 +537,19 @@ export function MeseroView() {
                 ))}
 
                 <div>
-                  <label className="block text-[11px] font-bold text-slate-400 mb-1">Notas especiales:</label>
+                  <label className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 mb-1">Notas especiales:</label>
                   <textarea
                     value={notas}
                     onChange={(e) => setNotas(e.target.value)}
                     placeholder="Ej. Sin hielo, servilletas extra..."
                     rows={2}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2 text-xs text-white"
+                    className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-2 text-xs text-slate-900 dark:text-white"
                   />
                 </div>
 
-                <div className="pt-3 border-t border-slate-800 flex items-center justify-between">
-                  <span className="text-xs text-slate-400">Total</span>
-                  <span className="text-xl font-black text-emerald-400">{formatCurrency(cartTotal)}</span>
+                <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                  <span className="text-xs text-slate-500 dark:text-slate-400">Total</span>
+                  <span className="text-xl font-black text-emerald-600 dark:text-emerald-400">{formatCurrency(cartTotal)}</span>
                 </div>
 
                 <button
@@ -562,23 +565,23 @@ export function MeseroView() {
         </div>
       )}
 
-      {/* MODAL SELECCIÓN DE TAMAÑO (8oz, 12oz, 24oz, 100oz) */}
+      {/* MODAL SELECCIÓN DE TAMAÑO */}
       {selectedProductForSize && (
-        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 w-full max-w-md rounded-2xl p-6 space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-              <h3 className="font-extrabold text-base text-white truncate pr-2">
+        <div className="fixed inset-0 z-50 bg-slate-950/70 dark:bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 w-full max-w-md rounded-2xl p-6 space-y-4 shadow-xl">
+            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
+              <h3 className="font-extrabold text-base text-slate-900 dark:text-white truncate pr-2">
                 {selectedProductForSize.nombre}
               </h3>
               <button
                 onClick={() => setSelectedProductForSize(null)}
-                className="text-slate-400 hover:text-white"
+                className="text-slate-400 hover:text-slate-600 dark:hover:text-white"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <p className="text-xs text-slate-400">Selecciona el tamaño o presentación deseada:</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400">Selecciona el tamaño o presentación deseada:</p>
 
             <div className="grid grid-cols-2 gap-2.5">
               {[
@@ -592,20 +595,20 @@ export function MeseroView() {
                   onClick={() => setSizeChosen(opt.size)}
                   className={`p-3 rounded-xl border text-left transition-all ${
                     sizeChosen === opt.size
-                      ? 'bg-emerald-500/10 border-emerald-500 text-emerald-400 font-black'
-                      : 'bg-slate-950 border-slate-800 text-slate-300 hover:bg-slate-800'
+                      ? 'bg-emerald-500/10 border-emerald-500 text-emerald-600 dark:text-emerald-400 font-black'
+                      : 'bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
                   }`}
                 >
                   <div className="text-xs font-bold">{opt.label}</div>
-                  <div className="text-xs text-emerald-400 mt-1">{formatCurrency(opt.price)}</div>
+                  <div className="text-xs text-emerald-600 dark:text-emerald-400 mt-1">{formatCurrency(opt.price)}</div>
                 </button>
               ))}
             </div>
 
-            <div className="pt-3 border-t border-slate-800 flex justify-end gap-2">
+            <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex justify-end gap-2">
               <button
                 onClick={() => setSelectedProductForSize(null)}
-                className="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 text-xs font-bold"
+                className="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs font-bold"
               >
                 Cancelar
               </button>

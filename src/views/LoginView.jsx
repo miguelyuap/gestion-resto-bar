@@ -3,7 +3,7 @@ import { Lock, Mail, ShieldAlert, LogIn } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 export function LoginView({ onLoginSuccess }) {
-  const { login } = useAuth();
+  const { login, negocio } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
@@ -31,70 +31,64 @@ export function LoginView({ onLoginSuccess }) {
     }
   };
 
+  const brandName = negocio?.nombre || 'GST Resto Bar';
+
   return (
     <div className="min-h-[80vh] flex items-center justify-center p-4">
-      <div className="w-full max-w-md bg-[#080c14] border border-emerald-500/30 rounded-3xl p-8 shadow-2xl glow-emerald relative overflow-hidden">
+      <div className="w-full max-w-md bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-8 shadow-xl relative overflow-hidden transition-colors duration-200">
         
-        {/* Glow de Fondo */}
-        <div className="absolute -top-10 -left-10 w-40 h-40 bg-emerald-500/10 rounded-full blur-3xl" />
-        <div className="absolute -bottom-10 -right-10 w-40 h-40 bg-pink-500/10 rounded-full blur-3xl" />
-
         <div className="relative z-10">
           
           {/* Header Marca */}
           <div className="text-center mb-8">
-            <div className="w-14 h-14 mx-auto mb-3 rounded-2xl bg-gradient-to-tr from-emerald-500 via-cyan-400 to-pink-500 p-0.5 shadow-lg shadow-emerald-500/20 flex items-center justify-center">
-              <div className="w-full h-full bg-[#080c14] rounded-[14px] flex items-center justify-center text-2xl">
-                🍹
-              </div>
+            <div className="w-14 h-14 mx-auto mb-3 rounded-2xl bg-emerald-500 text-slate-950 p-0.5 shadow-md shadow-emerald-500/20 flex items-center justify-center font-black text-2xl">
+              🍸
             </div>
-            <span className="px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 text-[10px] font-black uppercase tracking-wider border border-emerald-500/30">
+            <span className="px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-[10px] font-black uppercase tracking-wider border border-emerald-500/20">
               Acceso Restringido al Personal
             </span>
-            <h2 className="text-2xl font-black text-white mt-2">
-              Alo Mas Agogo
+            <h2 className="text-2xl font-black text-slate-900 dark:text-white mt-2">
+              {brandName}
             </h2>
-            <p className="text-xs text-slate-400 font-medium mt-0.5">
+            <p className="text-xs text-slate-500 dark:text-slate-400 font-medium mt-0.5">
               Inicia sesión como Administrador o Mesero
             </p>
           </div>
 
-          {/* Mensaje de Error */}
           {errorMsg && (
-            <div className="mb-6 p-3 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-xs text-rose-300 flex items-center gap-2">
-              <ShieldAlert className="w-4 h-4 text-rose-400 shrink-0" />
+            <div className="mb-6 p-3 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-600 dark:text-rose-400 text-xs flex items-center gap-2 font-medium">
+              <ShieldAlert className="w-4 h-4 shrink-0" />
               <span>{errorMsg}</span>
             </div>
           )}
 
-          {/* Formulario Login */}
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-4 text-xs">
             <div>
-              <label className="block text-xs font-bold text-slate-300 mb-1">Correo Electrónico:</label>
+              <label className="block text-slate-700 dark:text-slate-300 font-bold mb-1.5">Correo Electrónico</label>
               <div className="relative">
-                <Mail className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                <Mail className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input
                   type="email"
+                  required
+                  placeholder="admin@empresa.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="usuario@agogo.com"
-                  className="w-full bg-slate-900 border border-slate-800 focus:border-emerald-400 rounded-2xl pl-10 pr-4 py-3 text-xs text-white placeholder-slate-500 outline-none transition-all"
-                  required
+                  className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl pl-10 pr-4 py-3 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-emerald-500/50"
                 />
               </div>
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-300 mb-1">Contraseña:</label>
+              <label className="block text-slate-700 dark:text-slate-300 font-bold mb-1.5">Contraseña</label>
               <div className="relative">
-                <Lock className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                <Lock className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input
                   type="password"
+                  required
+                  placeholder="••••••••"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                  className="w-full bg-slate-900 border border-slate-800 focus:border-emerald-400 rounded-2xl pl-10 pr-4 py-3 text-xs text-white placeholder-slate-500 outline-none transition-all"
-                  required
+                  className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl pl-10 pr-4 py-3 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-emerald-500/50"
                 />
               </div>
             </div>
@@ -102,15 +96,14 @@ export function LoginView({ onLoginSuccess }) {
             <button
               type="submit"
               disabled={isSubmitting}
-              className="w-full py-3.5 bg-gradient-to-r from-emerald-400 via-cyan-400 to-teal-400 text-slate-950 font-black rounded-2xl text-xs sm:text-sm flex items-center justify-center gap-2 transition-all shadow-lg active:scale-95 disabled:opacity-50 mt-2"
+              className="w-full py-3.5 rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-sm transition-all shadow-md shadow-emerald-500/20 disabled:opacity-50 flex items-center justify-center gap-2 mt-6"
             >
               <LogIn className="w-4 h-4" />
-              <span>{isSubmitting ? 'Verificando...' : 'Iniciar Sesión'}</span>
+              <span>{isSubmitting ? 'Iniciando Sesión...' : 'Ingresar al Sistema'}</span>
             </button>
           </form>
 
         </div>
-
       </div>
     </div>
   );

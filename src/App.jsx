@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { ThemeProvider, useTheme } from './context/ThemeContext';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { Navbar } from './components/Navbar';
 import { ClientMenuView } from './views/ClientMenuView';
@@ -7,9 +8,11 @@ import { MeseroView } from './views/MeseroView';
 import { CajaView } from './views/CajaView';
 import { MesasQrView } from './views/MesasQrView';
 import { UsuariosView } from './views/UsuariosView';
+import { ProductosAdminView } from './views/ProductosAdminView';
+import { ReportesVentasView } from './views/ReportesVentasView';
 
 function AppContent() {
-  const { profile } = useAuth();
+  const { profile, negocio } = useAuth();
   const [activeTab, setActiveTab] = useState('mesero');
   const [currentMesaNum, setCurrentMesaNum] = useState(null);
   const [isQRClient, setIsQRClient] = useState(false);
@@ -18,7 +21,6 @@ function AppContent() {
     const params = new URLSearchParams(window.location.search);
     const mesaParam = params.get('mesa');
     
-    // Si se accedió por código QR (?mesa=X), es un cliente y la vista es 100% informativa
     if (mesaParam) {
       setCurrentMesaNum(parseInt(mesaParam));
       setIsQRClient(true);
@@ -26,7 +28,6 @@ function AppContent() {
       return;
     }
 
-    // Ajustar tab inicial por defecto según el rol del usuario
     if (profile?.rol === 'admin') {
       setActiveTab('caja');
     } else {
@@ -34,7 +35,6 @@ function AppContent() {
     }
   }, [profile]);
 
-  // Redirección posterior al inicio de sesión basada en el rol del usuario
   const handleRoleRedirect = (userProfile, targetTab = null) => {
     if (targetTab) {
       setActiveTab(targetTab);
@@ -42,14 +42,14 @@ function AppContent() {
     }
 
     if (userProfile?.rol === 'admin') {
-      setActiveTab('caja'); // Redirigir a Caja si es Administrador
+      setActiveTab('caja');
     } else {
-      setActiveTab('mesero'); // Redirigir a Toma de Pedidos si es Empleado
+      setActiveTab('mesero');
     }
   };
 
   return (
-    <div className="min-h-screen bg-[#080c14] text-slate-100 flex flex-col font-sans">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col font-sans transition-colors duration-200">
       <Navbar 
         activeTab={activeTab} 
         setActiveTab={setActiveTab} 
@@ -77,6 +77,20 @@ function AppContent() {
           </ProtectedRoute>
         )}
 
+        {/* Módulo de Reportes de Ventas por Fechas (Exclusivo para 'admin') */}
+        {!isQRClient && activeTab === 'reportes' && (
+          <ProtectedRoute allowedRoles={['admin']} onRedirect={handleRoleRedirect}>
+            <ReportesVentasView />
+          </ProtectedRoute>
+        )}
+
+        {/* Vista de Gestión de Productos y Categorías (Exclusiva para 'admin') */}
+        {!isQRClient && activeTab === 'productos' && (
+          <ProtectedRoute allowedRoles={['admin']} onRedirect={handleRoleRedirect}>
+            <ProductosAdminView />
+          </ProtectedRoute>
+        )}
+
         {/* Vista de Gestión de Usuarios y Personal (Exclusiva para 'admin') */}
         {!isQRClient && activeTab === 'usuarios' && (
           <ProtectedRoute allowedRoles={['admin']} onRedirect={handleRoleRedirect}>
@@ -92,8 +106,8 @@ function AppContent() {
         )}
       </main>
 
-      <footer className="py-6 border-t border-slate-800/80 text-center text-xs text-slate-500">
-        <p>Alo Mas Agogo &copy; {new Date().getFullYear()} &bull; GST-Software</p>
+      <footer className="py-6 border-t border-slate-200 dark:border-slate-800/80 text-center text-xs text-slate-500 dark:text-slate-400 bg-white/50 dark:bg-slate-950/50 backdrop-blur-sm">
+        <p>{negocio?.nombre || 'GST Resto Bar'} &copy; {new Date().getFullYear()} &bull; SaaS Multi-Tenant</p>
       </footer>
     </div>
   );
@@ -101,9 +115,11 @@ function AppContent() {
 
 export function App() {
   return (
-    <AuthProvider>
-      <AppContent />
-    </AuthProvider>
+    <ThemeProvider>
+      <AuthProvider>
+        <AppContent />
+      </AuthProvider>
+    </ThemeProvider>
   );
 }
 
