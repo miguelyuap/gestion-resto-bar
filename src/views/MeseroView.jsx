@@ -71,7 +71,40 @@ export function MeseroView() {
     setMesaActualObj(found || null);
   };
 
-  const handleOpenSizeModal = (producto) => {
+  const handleAddToCartDirectOrModal = (producto) => {
+    const p8 = Number(producto.precio_8oz) || 0;
+    const p12 = Number(producto.precio_12oz) || 0;
+    const p24 = Number(producto.precio_24oz) || 0;
+    const p100 = Number(producto.precio_100oz) || 0;
+
+    const hasMultipleSizes = (p8 > 0 && p8 !== p12) || (p24 > 0 && p24 !== p12) || (p100 > 0 && p100 !== p12);
+
+    if (!hasMultipleSizes) {
+      const pUnit = Number(producto.precio) || p12 || p8 || 0;
+      setCart(prev => {
+        const existingIndex = prev.findIndex(
+          item => item.producto.id === producto.id && item.tamano === 'unidad'
+        );
+
+        if (existingIndex !== -1) {
+          const updated = [...prev];
+          updated[existingIndex].cantidad += 1;
+          return updated;
+        }
+
+        return [
+          ...prev,
+          {
+            producto,
+            tamano: 'unidad',
+            cantidad: 1,
+            precio_unitario: pUnit
+          }
+        ];
+      });
+      return;
+    }
+
     setSelectedProductForSize(producto);
     setSizeChosen('12oz');
   };
@@ -80,7 +113,7 @@ export function MeseroView() {
     if (!selectedProductForSize) return;
 
     const prod = selectedProductForSize;
-    let precioUnitario = prod.precio_12oz;
+    let precioUnitario = prod.precio || prod.precio_12oz;
     if (sizeChosen === '8oz') precioUnitario = prod.precio_8oz;
     if (sizeChosen === '24oz') precioUnitario = prod.precio_24oz;
     if (sizeChosen === '100oz') precioUnitario = prod.precio_100oz;
@@ -364,13 +397,13 @@ export function MeseroView() {
 
                   <div className="flex items-center justify-between pt-3 border-t border-slate-100 dark:border-slate-800/60 mt-auto">
                     <div className="text-xs">
-                      <span className="text-slate-400 dark:text-slate-500 block text-[10px]">Desde (12oz)</span>
-                      <span className="font-black text-emerald-600 dark:text-emerald-400 text-sm">{formatCurrency(prod.precio_12oz)}</span>
+                      <span className="text-slate-400 dark:text-slate-500 block text-[10px]">Precio</span>
+                      <span className="font-black text-emerald-600 dark:text-emerald-400 text-sm">{formatCurrency(prod.precio || prod.precio_12oz || prod.precio_8oz)}</span>
                     </div>
 
                     <button
-                      onClick={() => handleOpenSizeModal(prod)}
-                      className="px-3.5 py-1.5 rounded-xl bg-emerald-500 text-slate-950 font-bold text-xs hover:bg-emerald-400 transition-colors flex items-center gap-1.5 shadow-sm"
+                      onClick={() => handleAddToCartDirectOrModal(prod)}
+                      className="px-3.5 py-1.5 rounded-xl bg-emerald-500 text-slate-950 font-bold text-xs hover:bg-emerald-400 transition-colors flex items-center gap-1.5 shadow-sm active:scale-95"
                     >
                       <Plus className="w-3.5 h-3.5" />
                       <span>Agregar</span>

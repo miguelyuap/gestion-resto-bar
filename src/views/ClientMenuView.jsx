@@ -159,23 +159,34 @@ export function ClientMenuView({ mesaNum }) {
                   </p>
                 </div>
 
-                <div className="pt-3 border-t border-slate-100 dark:border-slate-800/80 grid grid-cols-2 gap-2 text-xs">
-                  <div className="bg-slate-50 dark:bg-slate-950 p-2 rounded-xl border border-slate-200 dark:border-slate-800/60">
-                    <span className="text-[10px] text-slate-400 dark:text-slate-500 block">Vasito 8 oz</span>
-                    <span className="font-bold text-slate-700 dark:text-slate-200">{formatCurrency(prod.precio_8oz)}</span>
-                  </div>
-                  <div className="bg-slate-50 dark:bg-slate-950 p-2 rounded-xl border border-slate-200 dark:border-slate-800/60">
-                    <span className="text-[10px] text-slate-400 dark:text-slate-500 block">Estándar 12 oz</span>
-                    <span className="font-bold text-emerald-600 dark:text-emerald-400">{formatCurrency(prod.precio_12oz)}</span>
-                  </div>
-                  <div className="bg-slate-50 dark:bg-slate-950 p-2 rounded-xl border border-slate-200 dark:border-slate-800/60">
-                    <span className="text-[10px] text-slate-400 dark:text-slate-500 block">Grande 24 oz</span>
-                    <span className="font-bold text-slate-700 dark:text-slate-200">{formatCurrency(prod.precio_24oz)}</span>
-                  </div>
-                  <div className="bg-slate-50 dark:bg-slate-950 p-2 rounded-xl border border-slate-200 dark:border-slate-800/60">
-                    <span className="text-[10px] text-slate-400 dark:text-slate-500 block">Jarra 100 oz</span>
-                    <span className="font-bold text-slate-700 dark:text-slate-200">{formatCurrency(prod.precio_100oz)}</span>
-                  </div>
+                <div className="pt-3 border-t border-slate-100 dark:border-slate-800/80">
+                  {((Number(prod.precio_8oz) > 0 || Number(prod.precio_24oz) > 0 || Number(prod.precio_100oz) > 0) && (Number(prod.precio_8oz) !== Number(prod.precio_12oz))) ? (
+                    <div className="grid grid-cols-2 gap-2 text-xs">
+                      <div className="bg-slate-50 dark:bg-slate-950 p-2 rounded-xl border border-slate-200 dark:border-slate-800/60">
+                        <span className="text-[10px] text-slate-400 dark:text-slate-500 block">Vasito 8 oz</span>
+                        <span className="font-bold text-slate-700 dark:text-slate-200">{formatCurrency(prod.precio_8oz)}</span>
+                      </div>
+                      <div className="bg-slate-50 dark:bg-slate-950 p-2 rounded-xl border border-slate-200 dark:border-slate-800/60">
+                        <span className="text-[10px] text-slate-400 dark:text-slate-500 block">Estándar 12 oz</span>
+                        <span className="font-bold text-emerald-600 dark:text-emerald-400">{formatCurrency(prod.precio_12oz)}</span>
+                      </div>
+                      <div className="bg-slate-50 dark:bg-slate-950 p-2 rounded-xl border border-slate-200 dark:border-slate-800/60">
+                        <span className="text-[10px] text-slate-400 dark:text-slate-500 block">Grande 24 oz</span>
+                        <span className="font-bold text-slate-700 dark:text-slate-200">{formatCurrency(prod.precio_24oz)}</span>
+                      </div>
+                      <div className="bg-slate-50 dark:bg-slate-950 p-2 rounded-xl border border-slate-200 dark:border-slate-800/60">
+                        <span className="text-[10px] text-slate-400 dark:text-slate-500 block">Jarra 100 oz</span>
+                        <span className="font-bold text-slate-700 dark:text-slate-200">{formatCurrency(prod.precio_100oz)}</span>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl flex items-center justify-between">
+                      <span className="text-xs font-bold text-slate-600 dark:text-slate-400">Precio</span>
+                      <span className="text-sm font-black text-emerald-600 dark:text-emerald-400">
+                        {formatCurrency(prod.precio || prod.precio_12oz || prod.precio_8oz)}
+                      </span>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

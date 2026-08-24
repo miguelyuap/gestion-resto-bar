@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Package, Plus, Search, Trash2, RefreshCw, Sparkles, 
-  Tag, Image as ImageIcon, AlertTriangle, CheckCircle2, X, DollarSign, Layers
+  Tag, Image as ImageIcon, AlertTriangle, CheckCircle2, X, DollarSign, Layers, Utensils
 } from 'lucide-react';
 import { apiService } from '../services/api';
 import { useAuth } from '../context/AuthContext';
@@ -19,10 +19,14 @@ export function ProductosAdminView() {
   
   // Campos del Formulario de Producto
   const [nombre, setNombre] = useState('');
-  const [categoria, setCategoria] = useState('con_licor');
+  const [categoria, setCategoria] = useState('comidas');
   const [nuevaCategoriaText, setNuevaCategoriaText] = useState('');
   const [isCreandoNuevaCat, setIsCreandoNuevaCat] = useState(false);
   const [ingredientes, setIngredientes] = useState('');
+
+  // Tipo de Precio: 'unico' (Plato / Restaurante / Producto Estándar) vs 'tamanos' (Granizados / Bebidas por oz)
+  const [tipoPrecio, setTipoPrecio] = useState('unico');
+  const [precioUnico, setPrecioUnico] = useState('');
   const [precio8oz, setPrecio8oz] = useState('');
   const [precio12oz, setPrecio12oz] = useState('');
   const [precio24oz, setPrecio24oz] = useState('');
@@ -75,32 +79,47 @@ export function ProductosAdminView() {
       return;
     }
 
+    let payload = {
+      nombre,
+      categoria: finalCategory,
+      ingredientes,
+      imagen_url: imagenUrl || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=400&q=80'
+    };
+
+    if (tipoPrecio === 'unico') {
+      const val = Number(precioUnico) || 0;
+      if (val <= 0) {
+        setFeedback({ type: 'error', message: 'Por favor ingresa un precio válido mayor a 0.' });
+        return;
+      }
+      payload.precio = val;
+      payload.precio_12oz = val;
+      payload.precio_8oz = 0;
+      payload.precio_24oz = 0;
+      payload.precio_100oz = 0;
+    } else {
+      payload.precio = Number(precio12oz) || Number(precio8oz) || 0;
+      payload.precio_8oz = Number(precio8oz) || 0;
+      payload.precio_12oz = Number(precio12oz) || 0;
+      payload.precio_24oz = Number(precio24oz) || 0;
+      payload.precio_100oz = Number(precio100oz) || 0;
+    }
+
     try {
       setIsSubmitting(true);
       setFeedback(null);
 
-      await apiService.crearProducto(
-        {
-          nombre,
-          categoria: finalCategory,
-          ingredientes,
-          precio_8oz: precio8oz || 0,
-          precio_12oz: precio12oz || 0,
-          precio_24oz: precio24oz || 0,
-          precio_100oz: precio100oz || 0,
-          imagen_url: imagenUrl
-        },
-        negocio?.id
-      );
+      await apiService.crearProducto(payload, negocio?.id);
 
-      setFeedback({ type: 'success', message: `Producto "${nombre}" creado exitosamente.` });
+      setFeedback({ type: 'success', message: `Producto "${nombre}" creado y guardado exitosamente.` });
 
       // Reset Form
       setNombre('');
-      setCategoria(categoriasExistentes[0] || 'con_licor');
+      setCategoria(categoriasExistentes[0] || 'comidas');
       setNuevaCategoriaText('');
       setIsCreandoNuevaCat(false);
       setIngredientes('');
+      setPrecioUnico('');
       setPrecio8oz('');
       setPrecio12oz('');
       setPrecio24oz('');
@@ -111,7 +130,7 @@ export function ProductosAdminView() {
       loadProductos();
     } catch (err) {
       console.error('Error creando producto:', err);
-      setFeedback({ type: 'error', message: 'No se pudo crear el producto. Intenta nuevamente.' });
+      setFeedback({ type: 'error', message: `Error guardando producto: ${err.message || 'Intenta nuevamente.'}` });
     } finally {
       setIsSubmitting(false);
     }
@@ -142,6 +161,15 @@ export function ProductosAdminView() {
     return matchCat && matchSearch;
   });
 
+  const hasMultipleSizes = (prod) => {
+    const p8 = Number(prod.precio_8oz) || 0;
+    const p12 = Number(prod.precio_12oz) || 0;
+    const p24 = Number(prod.precio_24oz) || 0;
+    const p100 = Number(prod.precio_100oz) || 0;
+    const hasOtherSizes = (p8 > 0 && p8 !== p12) || (p24 > 0 && p24 !== p12) || (p100 > 0 && p100 !== p12);
+    return hasOtherSizes;
+  };
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 pb-24">
       
@@ -149,15 +177,15 @@ export function ProductosAdminView() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 rounded-2xl shadow-sm transition-colors duration-200">
         <div className="flex items-center gap-4">
           <div className="w-12 h-12 rounded-xl bg-emerald-500 text-slate-950 flex items-center justify-center font-black text-xl shrink-0 shadow-sm">
-            🍸
+            🍔
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-xl sm:text-2xl font-extrabold text-slate-900 dark:text-white">Gestión de Productos y Menú</h1>
+              <h1 className="text-xl sm:text-2xl font-extrabold text-slate-900 dark:text-white">Gestión de Catálogo y Menú</h1>
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
             </div>
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-              {negocio?.nombre || 'GST Resto Bar'} &bull; Agrega, administra y elimina productos o categorías del catálogo
+              {negocio?.nombre || 'GST Resto Bar'} &bull; Agrega platos de restaurante, comidas, bebidas o granizados al menú
             </p>
           </div>
         </div>
@@ -253,64 +281,79 @@ export function ProductosAdminView() {
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {productosFiltrados.map(prod => (
-            <div
-              key={prod.id}
-              className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 rounded-2xl overflow-hidden transition-all shadow-sm flex flex-col justify-between"
-            >
-              <div>
-                <div className="relative h-44 overflow-hidden bg-slate-950">
-                  <img
-                    src={prod.imagen_url || 'https://images.unsplash.com/photo-1536935338788-846bb9981813?auto=format&fit=crop&w=400&q=80'}
-                    alt={prod.nombre}
-                    className="w-full h-full object-cover"
-                  />
-                  <div className="absolute top-3 left-3 bg-slate-950/80 backdrop-blur-md px-2.5 py-1 rounded-full text-[10px] font-black text-emerald-400 border border-slate-800 uppercase tracking-wider">
-                    {prod.categoria.replace('_', ' ')}
+          {productosFiltrados.map(prod => {
+            const isMultiSize = hasMultipleSizes(prod);
+            const mainPriceVal = prod.precio || prod.precio_12oz || prod.precio_8oz || 0;
+
+            return (
+              <div
+                key={prod.id}
+                className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 rounded-2xl overflow-hidden transition-all shadow-sm flex flex-col justify-between"
+              >
+                <div>
+                  <div className="relative h-44 overflow-hidden bg-slate-950">
+                    <img
+                      src={prod.imagen_url || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=400&q=80'}
+                      alt={prod.nombre}
+                      className="w-full h-full object-cover"
+                    />
+                    <div className="absolute top-3 left-3 bg-slate-950/80 backdrop-blur-md px-2.5 py-1 rounded-full text-[10px] font-black text-emerald-400 border border-slate-800 uppercase tracking-wider">
+                      {prod.categoria.replace('_', ' ')}
+                    </div>
+
+                    <button
+                      onClick={() => setProductToDelete(prod)}
+                      className="absolute top-3 right-3 p-2 rounded-xl bg-rose-500/80 hover:bg-rose-600 text-white backdrop-blur-md transition-colors shadow-md"
+                      title="Eliminar Producto"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
                   </div>
 
-                  <button
-                    onClick={() => setProductToDelete(prod)}
-                    className="absolute top-3 right-3 p-2 rounded-xl bg-rose-500/80 hover:bg-rose-600 text-white backdrop-blur-md transition-colors shadow-md"
-                    title="Eliminar Producto"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
+                  <div className="p-5 space-y-3">
+                    <div>
+                      <h3 className="font-extrabold text-base text-slate-900 dark:text-white">
+                        {prod.nombre}
+                      </h3>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 line-clamp-2">
+                        {prod.ingredientes || 'Sin descripción especificada.'}
+                      </p>
+                    </div>
 
-                <div className="p-5 space-y-3">
-                  <div>
-                    <h3 className="font-extrabold text-base text-slate-900 dark:text-white">
-                      {prod.nombre}
-                    </h3>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 line-clamp-2">
-                      {prod.ingredientes || 'Sin ingredientes especificados.'}
-                    </p>
-                  </div>
+                    {/* Precios: Múltiples Tamaños vs Precio Único Estándar */}
+                    <div className="pt-2 border-t border-slate-100 dark:border-slate-800/80">
+                      {isMultiSize ? (
+                        <div className="grid grid-cols-2 gap-2 text-xs">
+                          <div className="bg-slate-50 dark:bg-slate-950 p-2 rounded-xl border border-slate-200 dark:border-slate-800/60">
+                            <span className="text-[10px] text-slate-400 dark:text-slate-500 block">8 oz</span>
+                            <span className="font-bold text-slate-700 dark:text-slate-200">{formatCurrency(prod.precio_8oz)}</span>
+                          </div>
+                          <div className="bg-slate-50 dark:bg-slate-950 p-2 rounded-xl border border-slate-200 dark:border-slate-800/60">
+                            <span className="text-[10px] text-slate-400 dark:text-slate-500 block">12 oz</span>
+                            <span className="font-bold text-emerald-600 dark:text-emerald-400">{formatCurrency(prod.precio_12oz)}</span>
+                          </div>
+                          <div className="bg-slate-50 dark:bg-slate-950 p-2 rounded-xl border border-slate-200 dark:border-slate-800/60">
+                            <span className="text-[10px] text-slate-400 dark:text-slate-500 block">24 oz</span>
+                            <span className="font-bold text-slate-700 dark:text-slate-200">{formatCurrency(prod.precio_24oz)}</span>
+                          </div>
+                          <div className="bg-slate-50 dark:bg-slate-950 p-2 rounded-xl border border-slate-200 dark:border-slate-800/60">
+                            <span className="text-[10px] text-slate-400 dark:text-slate-500 block">100 oz</span>
+                            <span className="font-bold text-slate-700 dark:text-slate-200">{formatCurrency(prod.precio_100oz)}</span>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl flex items-center justify-between">
+                          <span className="text-xs font-bold text-slate-600 dark:text-slate-400">Precio de Venta:</span>
+                          <span className="text-base font-black text-emerald-600 dark:text-emerald-400">{formatCurrency(mainPriceVal)}</span>
+                        </div>
+                      )}
+                    </div>
 
-                  {/* Precios por tamaño */}
-                  <div className="grid grid-cols-2 gap-2 text-xs pt-2 border-t border-slate-100 dark:border-slate-800/80">
-                    <div className="bg-slate-50 dark:bg-slate-950 p-2 rounded-xl border border-slate-200 dark:border-slate-800/60">
-                      <span className="text-[10px] text-slate-400 dark:text-slate-500 block">8 oz</span>
-                      <span className="font-bold text-slate-700 dark:text-slate-200">{formatCurrency(prod.precio_8oz)}</span>
-                    </div>
-                    <div className="bg-slate-50 dark:bg-slate-950 p-2 rounded-xl border border-slate-200 dark:border-slate-800/60">
-                      <span className="text-[10px] text-slate-400 dark:text-slate-500 block">12 oz</span>
-                      <span className="font-bold text-emerald-600 dark:text-emerald-400">{formatCurrency(prod.precio_12oz)}</span>
-                    </div>
-                    <div className="bg-slate-50 dark:bg-slate-950 p-2 rounded-xl border border-slate-200 dark:border-slate-800/60">
-                      <span className="text-[10px] text-slate-400 dark:text-slate-500 block">24 oz</span>
-                      <span className="font-bold text-slate-700 dark:text-slate-200">{formatCurrency(prod.precio_24oz)}</span>
-                    </div>
-                    <div className="bg-slate-50 dark:bg-slate-950 p-2 rounded-xl border border-slate-200 dark:border-slate-800/60">
-                      <span className="text-[10px] text-slate-400 dark:text-slate-500 block">100 oz</span>
-                      <span className="font-bold text-slate-700 dark:text-slate-200">{formatCurrency(prod.precio_100oz)}</span>
-                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
@@ -340,7 +383,7 @@ export function ProductosAdminView() {
                 <input
                   type="text"
                   required
-                  placeholder="Ej. MOJITO CUBANO SPECL"
+                  placeholder="Ej. BANDEJA PAISA / HAMBURGUESA / BEBIDA"
                   value={nombre}
                   onChange={(e) => setNombre(e.target.value)}
                   className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2.5 text-slate-900 dark:text-white focus:outline-none focus:border-emerald-500"
@@ -349,17 +392,17 @@ export function ProductosAdminView() {
 
               {/* Categoría Dinámica */}
               <div>
-                <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">Categoría del Producto *</label>
+                <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">Categoría *</label>
                 <select
                   value={isCreandoNuevaCat ? '__NUEVA__' : categoria}
                   onChange={(e) => handleSelectCategoriaOption(e.target.value)}
                   className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2.5 text-slate-900 dark:text-white focus:outline-none focus:border-emerald-500 capitalize"
                 >
+                  <option value="comidas">Comidas / Platos 🍔</option>
+                  <option value="entradas">Entradas / Acompañantes 🍟</option>
                   <option value="con_licor">Con Licor 🍾</option>
-                  <option value="sin_licor">Sin Licor 🍧</option>
-                  <option value="cremoso">Cremosos 🍦</option>
-                  <option value="comidas">Comidas 🍔</option>
-                  <option value="entradas">Entradas 🍟</option>
+                  <option value="sin_licor">Sin Licor / Bebidas 🍧</option>
+                  <option value="cremoso">Cremosos / Postres 🍦</option>
 
                   {/* Otras categorías ya existentes en el sistema */}
                   {categoriasExistentes
@@ -377,7 +420,7 @@ export function ProductosAdminView() {
                     <input
                       type="text"
                       required
-                      placeholder="Escribe el nombre de la nueva categoría (ej. Cervezas)"
+                      placeholder="Escribe el nombre de la nueva categoría (ej. Pastas)"
                       value={nuevaCategoriaText}
                       onChange={(e) => setNuevaCategoriaText(e.target.value)}
                       className="w-full bg-slate-50 dark:bg-slate-950 border border-emerald-500/50 rounded-xl px-3 py-2.5 text-slate-900 dark:text-white focus:outline-none"
@@ -386,71 +429,119 @@ export function ProductosAdminView() {
                 )}
               </div>
 
-              {/* Ingredientes */}
+              {/* Ingredientes / Descripción */}
               <div>
-                <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">Ingredientes o Descripción</label>
+                <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">Descripción o Ingredientes</label>
                 <input
                   type="text"
-                  placeholder="Ej. Ron blanco, menta fresca, soda y limón"
+                  placeholder="Ej. Carne 250g, huevo, chicharrón, arroz y arepa"
                   value={ingredientes}
                   onChange={(e) => setIngredientes(e.target.value)}
                   className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2.5 text-slate-900 dark:text-white focus:outline-none focus:border-emerald-500"
                 />
               </div>
 
-              {/* Precios */}
-              <div className="grid grid-cols-2 gap-3 pt-2">
-                <div>
-                  <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">Precio 8 oz</label>
-                  <input
-                    type="number"
-                    placeholder="12000"
-                    value={precio8oz}
-                    onChange={(e) => setPrecio8oz(e.target.value)}
-                    className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-slate-900 dark:text-white focus:outline-none"
-                  />
+              {/* Selector de Esquema de Precio: Único vs Tamaños */}
+              <div className="pt-2">
+                <label className="block font-bold text-slate-700 dark:text-slate-300 mb-2">Esquema de Precio *</label>
+                <div className="grid grid-cols-2 gap-2 mb-3">
+                  <button
+                    type="button"
+                    onClick={() => setTipoPrecio('unico')}
+                    className={`py-2.5 px-3 rounded-xl border text-xs font-bold flex items-center justify-center gap-2 transition-all ${
+                      tipoPrecio === 'unico'
+                        ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/40 font-black'
+                        : 'bg-slate-50 dark:bg-slate-950 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-800'
+                    }`}
+                  >
+                    <Utensils className="w-4 h-4" />
+                    <span>Precio Único (Plato/Unidad)</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setTipoPrecio('tamanos')}
+                    className={`py-2.5 px-3 rounded-xl border text-xs font-bold flex items-center justify-center gap-2 transition-all ${
+                      tipoPrecio === 'tamanos'
+                        ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/40 font-black'
+                        : 'bg-slate-50 dark:bg-slate-950 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-800'
+                    }`}
+                  >
+                    <Layers className="w-4 h-4" />
+                    <span>Precios por Tamaños (oz)</span>
+                  </button>
                 </div>
-                <div>
-                  <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">Precio 12 oz</label>
-                  <input
-                    type="number"
-                    placeholder="16000"
-                    value={precio12oz}
-                    onChange={(e) => setPrecio12oz(e.target.value)}
-                    className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-slate-900 dark:text-white focus:outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">Precio 24 oz</label>
-                  <input
-                    type="number"
-                    placeholder="24000"
-                    value={precio24oz}
-                    onChange={(e) => setPrecio24oz(e.target.value)}
-                    className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-slate-900 dark:text-white focus:outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">Precio 100 oz / Jarra</label>
-                  <input
-                    type="number"
-                    placeholder="70000"
-                    value={precio100oz}
-                    onChange={(e) => setPrecio100oz(e.target.value)}
-                    className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-slate-900 dark:text-white focus:outline-none"
-                  />
-                </div>
+
+                {tipoPrecio === 'unico' ? (
+                  <div>
+                    <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">Precio del Producto ($) *</label>
+                    <div className="relative">
+                      <DollarSign className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-emerald-500" />
+                      <input
+                        type="number"
+                        required
+                        placeholder="Ej. 25000"
+                        value={precioUnico}
+                        onChange={(e) => setPrecioUnico(e.target.value)}
+                        className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl pl-9 pr-3 py-2.5 text-slate-900 dark:text-white font-bold outline-none focus:border-emerald-500"
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 gap-3 p-3 bg-slate-50 dark:bg-slate-950 rounded-xl border border-slate-200 dark:border-slate-800">
+                    <div>
+                      <label className="block font-bold text-slate-600 dark:text-slate-400 mb-1">Precio 8 oz</label>
+                      <input
+                        type="number"
+                        placeholder="12000"
+                        value={precio8oz}
+                        onChange={(e) => setPrecio8oz(e.target.value)}
+                        className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-slate-900 dark:text-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="block font-bold text-slate-600 dark:text-slate-400 mb-1">Precio 12 oz</label>
+                      <input
+                        type="number"
+                        placeholder="16000"
+                        value={precio12oz}
+                        onChange={(e) => setPrecio12oz(e.target.value)}
+                        className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-slate-900 dark:text-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="block font-bold text-slate-600 dark:text-slate-400 mb-1">Precio 24 oz</label>
+                      <input
+                        type="number"
+                        placeholder="24000"
+                        value={precio24oz}
+                        onChange={(e) => setPrecio24oz(e.target.value)}
+                        className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-slate-900 dark:text-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="block font-bold text-slate-600 dark:text-slate-400 mb-1">Precio 100 oz / Jarra</label>
+                      <input
+                        type="number"
+                        placeholder="70000"
+                        value={precio100oz}
+                        onChange={(e) => setPrecio100oz(e.target.value)}
+                        className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-slate-900 dark:text-white"
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Imagen URL */}
               <div>
-                <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">URL de Imagen</label>
+                <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">URL de Imagen (Opcional)</label>
                 <input
                   type="text"
                   placeholder="https://images.unsplash.com/photo-..."
                   value={imagenUrl}
                   onChange={(e) => setImagenUrl(e.target.value)}
-                  className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2.5 text-slate-900 dark:text-white focus:outline-none focus:border-emerald-500"
+                  className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2.5 text-slate-900 dark:text-white outline-none focus:border-emerald-500"
                 />
               </div>
 
@@ -467,7 +558,7 @@ export function ProductosAdminView() {
                   disabled={isSubmitting}
                   className="px-5 py-2.5 rounded-xl bg-emerald-500 text-slate-950 font-black shadow-md hover:bg-emerald-400 disabled:opacity-50"
                 >
-                  {isSubmitting ? 'Guardando...' : 'Crear Producto'}
+                  {isSubmitting ? 'Guardando...' : 'Guardar Producto'}
                 </button>
               </div>
             </form>

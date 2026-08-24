@@ -54,8 +54,9 @@ REFERENCES public.negocios(id) ON DELETE CASCADE;
 CREATE TABLE IF NOT EXISTS public.productos (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     nombre TEXT NOT NULL,
-    categoria TEXT NOT NULL CHECK (categoria IN ('con_licor', 'sin_licor', 'cremoso', 'comidas', 'entradas')),
+    categoria TEXT NOT NULL,
     ingredientes TEXT,
+    precio NUMERIC(10, 2) NOT NULL DEFAULT 0,
     precio_8oz NUMERIC(10, 2) NOT NULL DEFAULT 0,
     precio_12oz NUMERIC(10, 2) NOT NULL DEFAULT 0,
     precio_24oz NUMERIC(10, 2) NOT NULL DEFAULT 0,
@@ -67,6 +68,9 @@ CREATE TABLE IF NOT EXISTS public.productos (
 ALTER TABLE public.productos 
 ADD COLUMN IF NOT EXISTS negocio_id UUID NOT NULL DEFAULT '00000000-0000-0000-0000-000000000001' 
 REFERENCES public.negocios(id) ON DELETE CASCADE;
+
+ALTER TABLE public.productos DROP CONSTRAINT IF EXISTS productos_categoria_check;
+ALTER TABLE public.productos ADD COLUMN IF NOT EXISTS precio NUMERIC(10, 2) NOT NULL DEFAULT 0;
 
 -- TABLA DE MESAS
 CREATE TABLE IF NOT EXISTS public.mesas (
@@ -109,11 +113,12 @@ CREATE TABLE IF NOT EXISTS public.detalle_pedido (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     pedido_id UUID NOT NULL REFERENCES public.pedidos(id) ON DELETE CASCADE,
     producto_id UUID NOT NULL REFERENCES public.productos(id) ON DELETE RESTRICT,
-    tamano TEXT NOT NULL CHECK (tamano IN ('8oz', '12oz', '24oz', '100oz', 'unidad')),
+    tamano TEXT NOT NULL,
     cantidad INTEGER NOT NULL CHECK (cantidad > 0),
     precio_unitario NUMERIC(10, 2) NOT NULL CHECK (precio_unitario >= 0),
     subtotal NUMERIC(10, 2) GENERATED ALWAYS AS (cantidad * precio_unitario) STORED
 );
+ALTER TABLE public.detalle_pedido DROP CONSTRAINT IF EXISTS detalle_pedido_tamano_check;
 
 -- 4. INDICES DE RENDIMIENTO MULTI-TENANT
 CREATE INDEX IF NOT EXISTS idx_perfiles_negocio_id ON public.perfiles(negocio_id);

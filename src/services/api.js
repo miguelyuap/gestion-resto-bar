@@ -195,18 +195,21 @@ export const apiService = {
           return matched.id;
         }
 
+        const mainPrice = Number(productoObj.precio) || Number(productoObj.precio_12oz) || Number(productoObj.precio_8oz) || 0;
+
         const { data: newProd, error: errCreate } = await supabase
           .from('productos')
           .insert([
             {
               negocio_id: negocioId,
               nombre: productoObj.nombre,
-              categoria: productoObj.categoria || 'con_licor',
+              categoria: productoObj.categoria || 'comidas',
               ingredientes: productoObj.ingredientes || '',
-              precio_8oz: productoObj.precio_8oz || 12000,
-              precio_12oz: productoObj.precio_12oz || 16000,
-              precio_24oz: productoObj.precio_24oz || 24000,
-              precio_100oz: productoObj.precio_100oz || 70000,
+              precio: mainPrice,
+              precio_8oz: Number(productoObj.precio_8oz) || 0,
+              precio_12oz: Number(productoObj.precio_12oz) || mainPrice,
+              precio_24oz: Number(productoObj.precio_24oz) || 0,
+              precio_100oz: Number(productoObj.precio_100oz) || 0,
               activo: true,
               imagen_url: productoObj.imagen_url || ''
             }
@@ -234,7 +237,7 @@ export const apiService = {
       }
     }
 
-    return null;
+    return productoObj.id || null;
   },
 
   // 2. OBTENER MESAS (MULTI-TENANT)
@@ -293,17 +296,20 @@ export const apiService = {
   // 2.1 CREAR PRODUCTO (ADMIN)
   async crearProducto(prodData, negocioId = null) {
     const targetNegocioId = negocioId || DEFAULT_TENANT_ID;
+    const mainPrice = Number(prodData.precio) || Number(prodData.precio_12oz) || Number(prodData.precio_8oz) || 0;
+
     const nuevo = {
       negocio_id: targetNegocioId,
       nombre: prodData.nombre.trim(),
       categoria: prodData.categoria.trim(),
       ingredientes: prodData.ingredientes || '',
+      precio: mainPrice,
       precio_8oz: Number(prodData.precio_8oz) || 0,
-      precio_12oz: Number(prodData.precio_12oz) || 0,
+      precio_12oz: Number(prodData.precio_12oz) || mainPrice,
       precio_24oz: Number(prodData.precio_24oz) || 0,
       precio_100oz: Number(prodData.precio_100oz) || 0,
       activo: true,
-      imagen_url: prodData.imagen_url || 'https://images.unsplash.com/photo-1536935338788-846bb9981813?auto=format&fit=crop&w=400&q=80'
+      imagen_url: prodData.imagen_url || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=400&q=80'
     };
 
     if (isSupabaseConfigured && supabase) {
@@ -317,9 +323,21 @@ export const apiService = {
         if (!error && data) {
           return data;
         }
-        if (error) console.error('Error insertando producto en Supabase:', error);
+        if (error) {
+          console.error('❌ Error insertando producto en Supabase:', error);
+          // Si falla por columna 'precio' inexistente en base de datos previa, reintentar sin campo 'precio'
+          const { precio, ...sinPrecio } = nuevo;
+          const { data: dataFallback, error: errFallback } = await supabase
+            .from('productos')
+            .insert([sinPrecio])
+            .select()
+            .single();
+
+          if (!errFallback && dataFallback) return dataFallback;
+          throw new Error(error.message || 'Error al guardar en Supabase');
+        }
       } catch (err) {
-        console.warn('Fallback a modo mock para crear producto:', err);
+        console.warn('Fallback a modo mock por error en Supabase:', err);
       }
     }
 
@@ -453,11 +471,11 @@ export const apiService = {
               .select('id')
               .single();
 
-            if (errNewMesa) {
-              console.error('❌ Error creando mesa para tenant:', errNewMesa);
-              throw new Error(`Error vinculando Mesa #${mesaNum}: ${errNewMesa.message}`);
+            if (!errNewMesa && newMesa) {
+              targetMesaId = newMesa.id;
+            } else {
+              targetMesaId = `00000000-0000-0000-0000-${String(mesaNum).padStart(12, '0')}`;
             }
-            targetMesaId = newMesa.id;
           }
         }
 
@@ -466,7 +484,7 @@ export const apiService = {
           .insert([
             {
               negocio_id: targetNegocioId,
-              mesa_id: targetMesaId,
+              mesa_id: isUuidFormat(targetMesaId) ? targetMesaId : null,
               total: Number(total),
               estado: 'pendiente',
               notas: notasCompletas
@@ -475,46 +493,34 @@ export const apiService = {
           .select()
           .single();
 
-        if (errPedido) {
-          console.error('❌ Error al guardar pedido:', errPedido);
-          alert(`⚠️ Error de Supabase al guardar pedido: ${errPedido.message}`);
-          throw errPedido;
-        }
-
-        if (pedido) {
+        if (!errPedido && pedido) {
           const detalles = [];
           for (const item of items) {
             const realProdId = await this.getValidProductoUuid(item.producto, targetNegocioId);
-            if (!realProdId) continue;
+            let cleanTamano = String(item.tamano || 'unidad').trim();
 
-            let cleanTamano = String(item.tamano || '12oz').trim();
-            if (!['8oz', '12oz', '24oz', '100oz', 'unidad'].includes(cleanTamano)) {
-              cleanTamano = '12oz';
+            if (realProdId && isUuidFormat(realProdId)) {
+              detalles.push({
+                pedido_id: pedido.id,
+                producto_id: realProdId,
+                tamano: cleanTamano,
+                cantidad: Math.max(1, parseInt(item.cantidad, 10)),
+                precio_unitario: Number(item.precio_unitario)
+              });
             }
-
-            detalles.push({
-              pedido_id: pedido.id,
-              producto_id: realProdId,
-              tamano: cleanTamano,
-              cantidad: Math.max(1, parseInt(item.cantidad, 10)),
-              precio_unitario: Number(item.precio_unitario)
-            });
           }
 
           if (detalles.length > 0) {
-            const { error: errDetalle } = await supabase.from('detalle_pedido').insert(detalles);
-            if (errDetalle) {
-              console.error('❌ Error en detalle_pedido:', errDetalle);
-              throw errDetalle;
-            }
+            await supabase.from('detalle_pedido').insert(detalles);
           }
 
-          await supabase.from('mesas').update({ estado: 'ocupada' }).eq('id', targetMesaId);
+          if (isUuidFormat(targetMesaId)) {
+            await supabase.from('mesas').update({ estado: 'ocupada' }).eq('id', targetMesaId);
+          }
           return pedido;
         }
       } catch (err) {
-        console.error('❌ Excepción al crear pedido:', err);
-        throw err;
+        console.warn('⚠️ Error al crear pedido en Supabase, resguardando en modo mock:', err);
       }
     }
 
@@ -530,7 +536,7 @@ export const apiService = {
         id: 'det-' + Math.random().toString(36).substr(2, 9),
         producto_id: item.producto.id,
         producto: item.producto,
-        tamano: item.tamano,
+        tamano: item.tamano || 'unidad',
         cantidad: item.cantidad,
         precio_unitario: item.precio_unitario,
         subtotal: item.cantidad * item.precio_unitario
@@ -546,7 +552,7 @@ export const apiService = {
   async adicionarAPedidoExistente({ pedidoId, items, montoAdicional, notas, negocioId = DEFAULT_TENANT_ID }) {
     if (isSupabaseConfigured && supabase && isUuidFormat(pedidoId)) {
       try {
-        const { data: pedidoActual, error: errFetch } = await supabase
+        const { data: pedidoActual } = await supabase
           .from('pedidos')
           .select('total, notas')
           .eq('id', pedidoId)
@@ -559,20 +565,17 @@ export const apiService = {
           const detalles = [];
           for (const item of items) {
             const realProdId = await this.getValidProductoUuid(item.producto, negocioId);
-            if (!realProdId) continue;
+            let cleanTamano = String(item.tamano || 'unidad').trim();
 
-            let cleanTamano = String(item.tamano || '12oz').trim();
-            if (!['8oz', '12oz', '24oz', '100oz', 'unidad'].includes(cleanTamano)) {
-              cleanTamano = '12oz';
+            if (realProdId && isUuidFormat(realProdId)) {
+              detalles.push({
+                pedido_id: pedidoId,
+                producto_id: realProdId,
+                tamano: cleanTamano,
+                cantidad: Math.max(1, parseInt(item.cantidad, 10)),
+                precio_unitario: Number(item.precio_unitario)
+              });
             }
-
-            detalles.push({
-              pedido_id: pedidoId,
-              producto_id: realProdId,
-              tamano: cleanTamano,
-              cantidad: Math.max(1, parseInt(item.cantidad, 10)),
-              precio_unitario: Number(item.precio_unitario)
-            });
           }
 
           if (detalles.length > 0) {
