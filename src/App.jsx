@@ -10,9 +10,10 @@ import { MesasQrView } from './views/MesasQrView';
 import { UsuariosView } from './views/UsuariosView';
 import { ProductosAdminView } from './views/ProductosAdminView';
 import { ReportesVentasView } from './views/ReportesVentasView';
+import { BrandingAdminView } from './views/BrandingAdminView';
 
 function AppContent() {
-  const { profile, negocio } = useAuth();
+  const { profile, negocio, fetchNegocioBySlug } = useAuth();
   const [activeTab, setActiveTab] = useState('mesero');
   const [currentMesaNum, setCurrentMesaNum] = useState(null);
   const [isQRClient, setIsQRClient] = useState(false);
@@ -20,6 +21,11 @@ function AppContent() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const mesaParam = params.get('mesa');
+    const negocioSlug = params.get('negocio') || params.get('tenant') || params.get('slug');
+
+    if (negocioSlug && fetchNegocioBySlug) {
+      fetchNegocioBySlug(negocioSlug);
+    }
     
     if (mesaParam) {
       setCurrentMesaNum(parseInt(mesaParam));
@@ -30,6 +36,8 @@ function AppContent() {
 
     if (profile?.rol === 'admin') {
       setActiveTab('caja');
+    } else if (profile?.rol === 'cliente') {
+      setActiveTab('menu');
     } else {
       setActiveTab('mesero');
     }
@@ -43,6 +51,8 @@ function AppContent() {
 
     if (userProfile?.rol === 'admin') {
       setActiveTab('caja');
+    } else if (userProfile?.rol === 'cliente') {
+      setActiveTab('menu');
     } else {
       setActiveTab('mesero');
     }
@@ -102,6 +112,13 @@ function AppContent() {
         {!isQRClient && activeTab === 'mesas' && (
           <ProtectedRoute allowedRoles={['admin']} onRedirect={handleRoleRedirect}>
             <MesasQrView />
+          </ProtectedRoute>
+        )}
+
+        {/* Studio de Personalización de Marca & Promociones (Exclusiva para 'admin') */}
+        {!isQRClient && activeTab === 'branding' && (
+          <ProtectedRoute allowedRoles={['admin']} onRedirect={handleRoleRedirect}>
+            <BrandingAdminView />
           </ProtectedRoute>
         )}
       </main>

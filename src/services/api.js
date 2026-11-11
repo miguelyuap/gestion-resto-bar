@@ -443,18 +443,30 @@ export const apiService = {
   },
 
   // 3. CREAR PEDIDO NUEVO (MULTI-TENANT)
-  async crearPedido({ negocio_id = DEFAULT_TENANT_ID, mesa_id, selectedMesaNum, items, total, notas, meseroNombre }) {
+  async crearPedido({ negocio_id = DEFAULT_TENANT_ID, mesa_id, selectedMesaNum, numero_mesa, tipo_pedido, cliente_nombre, cliente_telefono, cliente_direccion, metodo_pago, items, total, notas, meseroNombre }) {
     const targetNegocioId = negocio_id || DEFAULT_TENANT_ID;
-    const notasCompletas = meseroNombre 
-      ? `[Mesero: ${meseroNombre}] ${notas || ''}`.trim()
+    
+    let headerPrefix = '';
+    if (tipo_pedido === 'delivery') {
+      headerPrefix = `[🛵 DOMICILIO] Cliente: ${cliente_nombre || 'Cliente'} | Tel: ${cliente_telefono || 'N/A'} | Dir: ${cliente_direccion || 'N/A'} | Pago: ${metodo_pago || 'efectivo'}`;
+    } else if (tipo_pedido === 'takeaway') {
+      headerPrefix = `[🛍️ PARA LLEVAR] Cliente: ${cliente_nombre || 'Cliente'} | Tel: ${cliente_telefono || 'N/A'} | Pago: ${metodo_pago || 'efectivo'}`;
+    } else if (meseroNombre) {
+      headerPrefix = `[Mesero: ${meseroNombre}]`;
+    }
+
+    const notasCompletas = headerPrefix 
+      ? `${headerPrefix}${notas ? ` | ${notas}` : ''}`
       : (notas || '');
+
+    let createdPedidoObj = null;
 
     if (isSupabaseConfigured && supabase) {
       try {
         let targetMesaId = mesa_id;
 
-        if (!isUuidFormat(targetMesaId)) {
-          const mesaNum = parseInt(selectedMesaNum || 1, 10);
+        if (!isUuidFormat(targetMesaId) && tipo_pedido !== 'delivery' && tipo_pedido !== 'takeaway') {
+          const mesaNum = parseInt(selectedMesaNum || numero_mesa || 1, 10);
           const { data: mesaDb } = await supabase
             .from('mesas')
             .select('id')
@@ -479,24 +491,26 @@ export const apiService = {
           }
         }
 
+        const payloadInsert = {
+          negocio_id: targetNegocioId,
+          mesa_id: isUuidFormat(targetMesaId) ? targetMesaId : null,
+          total: Number(total),
+          estado: 'pendiente',
+          notas: notasCompletas
+        };
+
         const { data: pedido, error: errPedido } = await supabase
           .from('pedidos')
-          .insert([
-            {
-              negocio_id: targetNegocioId,
-              mesa_id: isUuidFormat(targetMesaId) ? targetMesaId : null,
-              total: Number(total),
-              estado: 'pendiente',
-              notas: notasCompletas
-            }
-          ])
+          .insert([payloadInsert])
           .select()
           .single();
 
         if (!errPedido && pedido) {
+          createdPedidoObj = pedido;
           const detalles = [];
           for (const item of items) {
-            const realProdId = await this.getValidProductoUuid(item.producto, targetNegocioId);
+            const prodObj = item.producto || item;
+            const realProdId = await this.getValidProductoUuid(prodObj, targetNegocioId);
             let cleanTamano = String(item.tamano || 'unidad').trim();
 
             if (realProdId && isUuidFormat(realProdId)) {
@@ -505,7 +519,7 @@ export const apiService = {
                 producto_id: realProdId,
                 tamano: cleanTamano,
                 cantidad: Math.max(1, parseInt(item.cantidad, 10)),
-                precio_unitario: Number(item.precio_unitario)
+                precio_unitario: Number(item.precio_unitario || item.precio || 0)
               });
             }
           }
@@ -517,7 +531,6 @@ export const apiService = {
           if (isUuidFormat(targetMesaId)) {
             await supabase.from('mesas').update({ estado: 'ocupada' }).eq('id', targetMesaId);
           }
-          return pedido;
         }
       } catch (err) {
         console.warn('⚠️ Error al crear pedido en Supabase, resguardando en modo mock:', err);
@@ -525,21 +538,28 @@ export const apiService = {
     }
 
     const newPedido = {
-      id: 'ped-' + Date.now(),
+      id: createdPedidoObj?.id || ('ped-' + Date.now()),
       negocio_id: targetNegocioId,
-      mesa_id,
+      mesa_id: mesa_id || null,
+      numero_mesa: numero_mesa || (tipo_pedido === 'delivery' ? 'DOMICILIO' : tipo_pedido === 'takeaway' ? 'PARA LLEVAR' : 'Mesa 1'),
+      tipo_pedido: tipo_pedido || 'mesa',
+      cliente_nombre,
+      cliente_telefono,
+      cliente_direccion,
+      metodo_pago,
       estado: 'pendiente',
-      total,
+      total: Number(total),
       notas: notasCompletas,
       created_at: new Date().toISOString(),
       detalles: items.map(item => ({
         id: 'det-' + Math.random().toString(36).substr(2, 9),
-        producto_id: item.producto.id,
-        producto: item.producto,
+        producto_id: item.producto_id || item.producto?.id || 'prod-1',
+        producto: item.producto || { nombre: item.nombre || 'Producto', precio: item.precio_unitario },
+        nombre: item.nombre || item.producto?.nombre || 'Producto',
         tamano: item.tamano || 'unidad',
         cantidad: item.cantidad,
-        precio_unitario: item.precio_unitario,
-        subtotal: item.cantidad * item.precio_unitario
+        precio_unitario: item.precio_unitario || item.precio || 0,
+        subtotal: item.cantidad * (item.precio_unitario || item.precio || 0)
       }))
     };
 

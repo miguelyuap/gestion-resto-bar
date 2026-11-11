@@ -1,0 +1,10 @@
+{
+  "description": "Access a stylish digital menu for Resto-Bars via QR code, featuring customizable branding, smooth navigation, and easy ordering for an enhanced dining experience.",
+  "robots": {
+    "index": false
+  },
+  "accessibility": {
+    "addBypassLinks": false,
+    "ignoreReducedMotion": false
+  }
+}
